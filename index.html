@@ -395,7 +395,46 @@ tr:hover td{background:rgba(255,255,255,.03)}
 </div>
 
 <script>
-/* ======================= Constants & localStorage keys ======================= */
+
+  
+// --- Header detection & normalization helpers ---
+function _normKey(s){
+  return String(s||"")
+    .trim()
+    .toLowerCase()
+    .replace(/[._/]+/g,"-")
+    .replace(/\s+/g,"-")
+    .replace(/[^a-z0-9-]/g,"")
+    .replace(/-+/g,"-");
+}
+function _looksLikeHeaderRow(cells){
+  // at least 3 non-empty cells, mostly textual (avoid pure numbers)
+  const nonEmpty = cells.filter(v => String(v).trim() !== "");
+  if (nonEmpty.length < 3) return false;
+  const textish = nonEmpty.filter(v => isNaN(Number(String(v).trim())));
+  return textish.length / nonEmpty.length >= 0.6;
+}
+function _detectHeaderRow(aoa){
+  for (let i = 0; i < aoa.length; i++){
+    if (_looksLikeHeaderRow(aoa[i])) return i;
+  }
+  return -1;
+}
+function _rowsFromAOA(aoa, headerRowIndex){
+  const headers = aoa[headerRowIndex].map(h => String(h||"").trim());
+  const rows = aoa.slice(headerRowIndex+1).filter(r => r.some(v => String(v).trim() !== ""));
+  return rows.map(r => {
+    const o = {};
+    headers.forEach((h, idx) => { o[h] = r[idx] ?? ""; });
+    return o;
+  });
+}
+
+
+  
+  
+  
+  /* ======================= Constants & localStorage keys ======================= */
 const DEFAULT_COLUMNS = [
  "customer-id","customer-name","customer-type-id","customer-type","contract-id",
  "payment-mode-code","payment_mode_description","book-channel-id","book-channel-name",
@@ -502,6 +541,7 @@ function activateTab(name,btn){
 
 /* ======================= Upload / Import (fix) ======================= */
 
+
 function handleFile(){
   if(!can("import")) return alert("Not allowed by role.");
   const f = document.getElementById("fileInput").files[0];
@@ -512,45 +552,59 @@ function handleFile(){
   reader.onload = (e) => {
     try{
       const data = new Uint8Array(e.target.result);
-      const wb = XLSX.read(data, { type: "array" });
+      const wb = XLSX.read(data, { type: "array", cellDates: true, raw: false });
 
-      // pick first sheet that has any !ref
-      let ws;
-      for(const name of wb.SheetNames){
-        const w = wb.Sheets[name];
-        if(w && w['!ref']) { ws = w; break; }
+      let parsed = null, diag = [];
+
+      for (const sheetName of wb.SheetNames){
+        const ws = wb.Sheets[sheetName];
+        if (!ws || !ws['!ref']) { diag.push(`Sheet "${sheetName}": empty !ref`); continue; }
+
+        // Strategy A: AOA parsing, header detection
+        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false, raw: false });
+        if (!aoa || aoa.length === 0) { diag.push(`Sheet "${sheetName}": empty AOA`); }
+        else {
+          const headerRow = _detectHeaderRow(aoa);
+          if (headerRow >= 0){
+            const arr = _rowsFromAOA(aoa, headerRow);
+            parsed = { arr, sheet: sheetName, headerRow };
+            break;
+          } else {
+            diag.push(`Sheet "${sheetName}": no header row (scanned ${aoa.length} rows)`);
+          }
+        }
+
+        // Strategy B: CSV fallback then rebuild AOA
+        if (!parsed){
+          const csv = XLSX.utils.sheet_to_csv(ws);
+          const rows = csv.split(/\r?\n/).map(line => line.split(","));
+          const headerRow = _detectHeaderRow(rows);
+          if (headerRow >= 0){
+            const arrCSV = _rowsFromAOA(rows, headerRow);
+            parsed = { arr: arrCSV, sheet: sheetName, headerRow, via: "csv" };
+            break;
+          } else {
+            diag.push(`Sheet "${sheetName}": CSV fallback also failed`);
+          }
+        }
       }
-      ws = ws || wb.Sheets[wb.SheetNames[0]];
 
-      // Read as AOA so we can detect the header row robustly
-      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-
-      // find header row as the first row with >= 3 non-empty cells
-      let headerRow = -1;
-      for(let i=0;i<aoa.length;i++){
-        const nonEmpty = aoa[i].filter(v => String(v).trim() !== "").length;
-        if(nonEmpty >= 3){ headerRow = i; break; }
+      if(!parsed) {
+        console.error("Parse diagnostics:", diag);
+        alert("File parse error. No valid header row found.\n\nDiagnostics:\n- " + diag.join("\n- "));
+        return;
       }
-      if(headerRow === -1) throw new Error("No header row detected.");
 
-      const headers = aoa[headerRow].map(h => String(h||"").trim());
-      const rowsAOA = aoa.slice(headerRow+1).filter(r => r.some(v => String(v).trim() !== ""));
-
-      // rebuild objects using headers
-      const arr = rowsAOA.map(r => {
-        const o = {};
-        headers.forEach((h,idx) => { o[h] = r[idx] ?? ""; });
-        return o;
-      });
-
-      importRows(arr);   // existing function (see updated mapping below)
+      importRows(parsed.arr); // let importRows do header normalization/mapping
     }catch(err){
       console.error(err);
-      alert("File parse error. Ensure the first row has headers and try again.");
+      alert("File parse error. Ensure the first row with headers is present and try again.");
     }
   };
   reader.readAsArrayBuffer(f);
 }
+
+
 
 
 function importRows(arr){
@@ -561,23 +615,15 @@ function importRows(arr){
   if(mode==="replace" && !confirm("Replace ALL rows?")) return;
   if(mode==="replace") rows = [];
 
-  const enabled = template.filter(c=>c.enabled).map(c=>c.key);
 
-  // robust normalizer: "Booking_Date Time" -> "booking-date-time"
-  const norm = s => String(s||"")
-      .trim()
-      .toLowerCase()
-      .replace(/[._/]+/g,"-")
-      .replace(/\s+/g,"-")
-      .replace(/[^a-z0-9-]/g,"")
-      .replace(/-+/g,"-");
+const enabled = template.filter(c=>c.enabled).map(c=>c.key);
 
-  // Build alias map for quick wins if needed later
+  // alias map for common variations
   const aliases = {
     "bookingdatetime":"booking-date-time",
     "booking-date":"booking-date-time",
-    "deliverydate":"delivery-date",
-    "deliverystatus":"delivery-status",
+    "deliverystatus":"DELIVERY STATUS",
+    "deliverydate":"DELIVERY DATE",
     "paymentmodedescription":"payment_mode_description",
     "payment-mode-description":"payment_mode_description",
     "paymentmodecode":"payment-mode-code",
@@ -594,32 +640,25 @@ function importRows(arr){
     "vpcodvalue":"vp-cod-value"
   };
 
-  // Prepare a normalized list of template keys for matching
-  const normTemplate = enabled.map(k => ({key:k, n:norm(k)}));
+  const normTemplate = enabled.map(k => ({ key: k, n: _normKey(k) }));
 
-  // Build a header map from source headers to our template keys
+  // Build a header map from the first row's keys of arr
+  const sample = arr[0] || {};
   const headerMap = {};
-  if(arr.length){
-    Object.keys(arr[0]).forEach(sc=>{
-      const ns = norm(sc);
-      const aliasHit = aliases[ns];
-      let match = null;
-      if(aliasHit){
-        // direct alias to canonical template key if exists
-        match = enabled.find(k => norm(k) === norm(aliasHit)) || aliasHit;
-      }else{
-        // try exact normalized match
-        const exact = normTemplate.find(t => t.n === ns);
-        if(exact) match = exact.key;
-        else{
-          // try soft startsWith match (e.g., "booking-date" -> "booking-date-time")
-          const soft = normTemplate.find(t => t.n.startsWith(ns) || ns.startsWith(t.n));
-          if(soft) match = soft.key;
-        }
-      }
-      headerMap[sc] = match || sc; // fall back to original key if unknown
-    });
-  }
+  Object.keys(sample).forEach(sc => {
+    const ns = _normKey(sc);
+    // 1) alias → canonical
+    const alias = aliases[ns];
+    if (alias && enabled.includes(alias)) { headerMap[sc] = alias; return; }
+    // 2) exact normalized match
+    const exact = normTemplate.find(t => t.n === ns);
+    if (exact) { headerMap[sc] = exact.key; return; }
+    // 3) soft startsWith match
+    const soft = normTemplate.find(t => t.n.startsWith(ns) || ns.startsWith(t.n));
+    headerMap[sc] = soft ? soft.key : sc; // fallback to original
+  });
+
+  
 
   // de-dup and validation counters
   let dup=0, miss=0, add=0;
