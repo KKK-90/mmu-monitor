@@ -6,6 +6,12 @@
 <title>MMU-Monitoring Dashboard</title>
 
 <!-- CDN deps kept minimal for GitHub Pages -->
+<!-- XLSX with automatic fallback -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.3/xlsx.full.min.js"
+        onerror="(function(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js';document.head.appendChild(s);}())">
+</script>
+
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.3/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.3/jspdf.plugin.autotable.min.js"></script>
@@ -539,10 +545,25 @@ function activateTab(name,btn){
   document.querySelectorAll("[data-tab]").forEach(sec=>{ sec.style.display=(sec.getAttribute("data-tab")===name)?"block":"none"; });
 }
 
+
+  async function ensureXLSX(){
+  if (window.XLSX) return;
+  // wait up to ~5s for the script to finish loading
+  await new Promise((resolve, reject)=>{
+    let tries = 0;
+    const t = setInterval(()=>{
+      if (window.XLSX){ clearInterval(t); resolve(); }
+      else if (++tries > 50){ clearInterval(t); reject(new Error("XLSX library failed to load")); }
+    }, 100);
+  });
+}
+
 /* ======================= Upload / Import (fix) ======================= */
 
 
-function handleFile(){
+async function handleFile(){
+  await ensureXLSX();  // <-- guarantees XLSX is defined before use
+
   if(!can("import")) return alert("Not allowed by role.");
   const f = document.getElementById("fileInput").files[0];
   if(!f) return alert("Choose a file first.");
