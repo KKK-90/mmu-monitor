@@ -503,46 +503,158 @@ function activateTab(name,btn){
 }
 
 /* ======================= Upload / Import (fix) ======================= */
+
 function handleFile(){
   if(!can("import")) return alert("Not allowed by role.");
-  const f=$("fileInput").files[0]; if(!f) return alert("Choose a file first.");
-  const reader=new FileReader();
-  reader.onerror=()=>alert("Could not read the file.");
-  reader.onload=(e)=>{
+  const f = document.getElementById("fileInput").files[0];
+  if(!f) return alert("Choose a file first.");
+
+  const reader = new FileReader();
+  reader.onerror = () => alert("Could not read the file.");
+  reader.onload = (e) => {
     try{
-      const data=new Uint8Array(e.target.result);
-      const wb=XLSX.read(data,{type:"array"});
-      // pick first non-empty sheet robustly
-      let ws; for(const name of wb.SheetNames){ const w=wb.Sheets[name]; const range=XLSX.utils.decode_range(w['!ref']||"A1:A1"); if(range.e.r>0 || range.e.c>0){ ws=w; break; } }
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: "array" });
+
+      // pick first sheet that has any !ref
+      let ws;
+      for(const name of wb.SheetNames){
+        const w = wb.Sheets[name];
+        if(w && w['!ref']) { ws = w; break; }
+      }
       ws = ws || wb.Sheets[wb.SheetNames[0]];
-      const arr=XLSX.utils.sheet_to_json(ws,{defval:""});
-      importRows(arr);
-    }catch(err){ console.error(err); alert("File parse error. Ensure the first row has headers and try again."); }
+
+      // Read as AOA so we can detect the header row robustly
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+      // find header row as the first row with >= 3 non-empty cells
+      let headerRow = -1;
+      for(let i=0;i<aoa.length;i++){
+        const nonEmpty = aoa[i].filter(v => String(v).trim() !== "").length;
+        if(nonEmpty >= 3){ headerRow = i; break; }
+      }
+      if(headerRow === -1) throw new Error("No header row detected.");
+
+      const headers = aoa[headerRow].map(h => String(h||"").trim());
+      const rowsAOA = aoa.slice(headerRow+1).filter(r => r.some(v => String(v).trim() !== ""));
+
+      // rebuild objects using headers
+      const arr = rowsAOA.map(r => {
+        const o = {};
+        headers.forEach((h,idx) => { o[h] = r[idx] ?? ""; });
+        return o;
+      });
+
+      importRows(arr);   // existing function (see updated mapping below)
+    }catch(err){
+      console.error(err);
+      alert("File parse error. Ensure the first row has headers and try again.");
+    }
   };
   reader.readAsArrayBuffer(f);
 }
-function importRows(arr){
-  const batchId=$("batchName").value.trim()||("Batch_"+new Date().toISOString().slice(0,10));
-  const batchType=$("batchType").value; const mode=$("importMode").value;
-  if(mode==="replace" && !confirm("Replace ALL rows?")) return;
-  if(mode==="replace") rows=[];
 
-  const enabled=template.filter(c=>c.enabled).map(c=>c.key);
-  const norm=s=>String(s||"").trim().toLowerCase();
-  const headerMap={};
-  if(arr.length){ Object.keys(arr[0]).forEach(sc=>{ const clean=norm(sc).replaceAll("_","-").replace(/\s+/g," "); const hit=enabled.find(k=>norm(k)===clean); headerMap[sc]=hit||sc; }); }
+
+function importRows(arr){
+  const batchId = document.getElementById("batchName").value.trim() || ("Batch_"+new Date().toISOString().slice(0,10));
+  const batchType = document.getElementById("batchType").value;
+  const mode = document.getElementById("importMode").value;
+
+  if(mode==="replace" && !confirm("Replace ALL rows?")) return;
+  if(mode==="replace") rows = [];
+
+  const enabled = template.filter(c=>c.enabled).map(c=>c.key);
+
+  // robust normalizer: "Booking_Date Time" -> "booking-date-time"
+  const norm = s => String(s||"")
+      .trim()
+      .toLowerCase()
+      .replace(/[._/]+/g,"-")
+      .replace(/\s+/g,"-")
+      .replace(/[^a-z0-9-]/g,"")
+      .replace(/-+/g,"-");
+
+  // Build alias map for quick wins if needed later
+  const aliases = {
+    "bookingdatetime":"booking-date-time",
+    "booking-date":"booking-date-time",
+    "deliverydate":"delivery-date",
+    "deliverystatus":"delivery-status",
+    "paymentmodedescription":"payment_mode_description",
+    "payment-mode-description":"payment_mode_description",
+    "paymentmodecode":"payment-mode-code",
+    "bookchannelid":"book-channel-id",
+    "bookchannelname":"book-channel-name",
+    "booktypeid":"book-type-id",
+    "booktypename":"book-type-name",
+    "customerid":"customer-id",
+    "customername":"customer-name",
+    "customertypeid":"customer-type-id",
+    "customertype":"customer-type",
+    "destinationpin":"destination-pin",
+    "vpcodtype":"vp-cod-type",
+    "vpcodvalue":"vp-cod-value"
+  };
+
+  // Prepare a normalized list of template keys for matching
+  const normTemplate = enabled.map(k => ({key:k, n:norm(k)}));
+
+  // Build a header map from source headers to our template keys
+  const headerMap = {};
+  if(arr.length){
+    Object.keys(arr[0]).forEach(sc=>{
+      const ns = norm(sc);
+      const aliasHit = aliases[ns];
+      let match = null;
+      if(aliasHit){
+        // direct alias to canonical template key if exists
+        match = enabled.find(k => norm(k) === norm(aliasHit)) || aliasHit;
+      }else{
+        // try exact normalized match
+        const exact = normTemplate.find(t => t.n === ns);
+        if(exact) match = exact.key;
+        else{
+          // try soft startsWith match (e.g., "booking-date" -> "booking-date-time")
+          const soft = normTemplate.find(t => t.n.startsWith(ns) || ns.startsWith(t.n));
+          if(soft) match = soft.key;
+        }
+      }
+      headerMap[sc] = match || sc; // fall back to original key if unknown
+    });
+  }
+
+  // de-dup and validation counters
   let dup=0, miss=0, add=0;
-  const existing=new Set(rows.map(r=>String(r["article-number"]||"")));
+  const existing = new Set(rows.map(r=>String(r["article-number"]||"")));
+
   arr.forEach(src=>{
-    const r={}; for(const [k,v] of Object.entries(src)){ r[headerMap[k]||k]=v; }
-    r._batchId=batchId; r._batchType=batchType;
+    const r={};
+    for(const [k,v] of Object.entries(src)){
+      const mapped = headerMap[k] || k;
+      r[mapped] = v;
+    }
+    r._batchId = batchId;
+    r._batchType = batchType;
+
+    // normalize status casing if present
+    if(r["DELIVERY STATUS"]) r["DELIVERY STATUS"] = String(r["DELIVERY STATUS"]).toUpperCase();
+
+    // required checks
     if(REQUIRED.some(k=>!String(r[k]||"").trim())) miss++;
-    const key=String(r["article-number"]||"");
-    if(key && existing.has(key)){ dup++; } else { if(key) existing.add(key); rows.push(r); add++; }
+
+    const key = String(r["article-number"]||"");
+    if(key && existing.has(key)){ dup++; }
+    else { if(key) existing.add(key); rows.push(r); add++; }
   });
-  persist(); refreshAll(); logAudit("import",{batchId,batchType,mode,added:add,duplicates:dup,missing:miss});
-  alert(`Imported ${add}. Duplicates: ${dup}. Missing requireds flagged: ${miss}.`);
+
+  persist(); refreshAll();
+  logAudit("import", {batchId,batchType,mode,added:add,duplicates:dup,missing:miss});
+  alert(`Imported ${add} row(s).\nDuplicates: ${dup}\nMissing requireds flagged: ${miss}\nBatch: ${batchId} (${batchType})`);
 }
+
+
+  
+  
 
 /* ======================= Manual Entry ======================= */
 function buildManualForm(){
