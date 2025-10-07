@@ -581,15 +581,18 @@ function activateTab(name,btn){
 
 /* ======================= XLSX readiness & Import ======================= */
 async function ensureXLSX(){
-  if (window.XLSX) return;
-  await new Promise((resolve, reject)=>{
+  if (window.XLSX) return true;
+  // wait up to ~10s for any CDN to finish
+  const ok = await new Promise((resolve) => {
     let tries = 0;
     const t = setInterval(()=>{
-      if (window.XLSX){ clearInterval(t); resolve(); }
-      else if (++tries > 80){ clearInterval(t); reject(new Error("XLSX library failed to load from both CDNs")); }
+      if (window.XLSX){ clearInterval(t); resolve(true); }
+      else if (++tries > 100){ clearInterval(t); resolve(false); }
     }, 100);
   });
+  return ok; // true if XLSX available, false if not
 }
+  
 
 <script>
 window.handleFile = async function handleFile(){
