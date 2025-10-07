@@ -10,13 +10,23 @@
 <!-- XLSX (Excel) with a fallback CDN -->
 <script id="xlsx-cdn" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.3/xlsx.full.min.js"></script>
 <script>
-  // If the first CDN fails to load, try jsDelivr
-  document.getElementById('xlsx-cdn').addEventListener('error', function () {
-    var s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js';
-    document.head.appendChild(s);
-  });
+  (function(){
+    const first = document.getElementById('xlsx-cdn');
+    first.addEventListener('error', function () {
+      // 2nd attempt: jsDelivr
+      var s2 = document.createElement('script');
+      s2.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js';
+      s2.onerror = function(){
+        // 3rd attempt: unpkg
+        var s3 = document.createElement('script');
+        s3.src = 'https://unpkg.com/xlsx@0.19.3/dist/xlsx.full.min.js';
+        document.head.appendChild(s3);
+      };
+      document.head.appendChild(s2);
+    });
+  })();
 </script>
+
 
 <!-- jsPDF & autotable -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -428,6 +438,44 @@ function _looksLikeHeaderRow(cells){
   return textish.length / nonEmpty.length >= 0.6;
 }
 
+
+/* Lightweight RFC4180 CSV parser (handles quotes, commas, CR/LF) */
+function parseCSV(text){
+  const rows = [];
+  let row = [], field = '';
+  let i = 0, inQuotes = false;
+
+  while (i < text.length){
+    const c = text[i];
+
+    if (inQuotes){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i += 2; continue; } // escaped quote
+        inQuotes = false; i++; continue;
+      } else {
+        field += c; i++; continue;
+      }
+    } else {
+      if (c === '"'){ inQuotes = true; i++; continue; }
+      if (c === ','){ row.push(field); field = ''; i++; continue; }
+      if (c === '\r'){
+        // handle CRLF as single newline
+        if (text[i+1] === '\n') i++;
+        row.push(field); rows.push(row); row = []; field = ''; i++; continue;
+      }
+      if (c === '\n'){ row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
+      field += c; i++;
+    }
+  }
+  // push last field/row
+  row.push(field); rows.push(row);
+  // trim trailing blank row if present
+  if (rows.length && rows[rows.length-1].length === 1 && rows[rows.length-1][0] === '') rows.pop();
+  return rows;
+}
+
+
+
 /* ======================= Constants & localStorage keys ======================= */
 const DEFAULT_COLUMNS = [
  "customer-id","customer-name","customer-type-id","customer-type","contract-id",
@@ -543,16 +591,65 @@ async function ensureXLSX(){
   });
 }
 
+<script>
 window.handleFile = async function handleFile(){
   try {
-    await ensureXLSX();
-    if(!can("import")) { alert("Not allowed by role."); return; }
     const input = document.getElementById("fileInput");
     const f = input && input.files && input.files[0];
     if(!f) { alert("Choose a file first."); return; }
 
+    const isCSV = /\.csv$/i.test(f.name) || (f.type && f.type.includes('csv'));
+
+    // Try to ensure XLSX if not CSV
+    const xlsxReady = isCSV ? false : await ensureXLSX();
+
+    if (!xlsxReady && !isCSV){
+      // XLSX blocked; guide the user & allow CSV import
+      alert(
+        "Excel parsing library (XLSX) couldn't be loaded from all CDNs.\n\n" +
+        "Quick workaround: open your Excel file and Save As → CSV, then upload the CSV here.\n\n" +
+        "Tip: You can also keep this page and try again later from a different network."
+      );
+      return;
+    }
+
+    // CSV path (no library required)
+    if (isCSV || !xlsxReady){
+      const reader = new FileReader();
+      reader.onerror = () => alert("Could not read the CSV file.");
+      reader.onload = (e) => {
+        try{
+          const text = e.target.result;
+          const aoa = parseCSV(text);
+          if (!aoa.length) throw new Error("CSV appears empty.");
+          // find header as first non-empty row with >=3 cells
+          let headerRow = -1;
+          for(let i=0;i<aoa.length;i++){
+            const nonEmpty = aoa[i].filter(v => String(v).trim() !== "");
+            if(nonEmpty.length >= 3){ headerRow = i; break; }
+          }
+          if(headerRow === -1) throw new Error("No plausible header row found in CSV.");
+          const headers = aoa[headerRow].map(h => String(h||"").trim());
+          const rowsAOA = aoa.slice(headerRow+1).filter(r => r.some(v => String(v).trim() !== ""));
+          const arr = rowsAOA.map(r => {
+            const o = {};
+            headers.forEach((h,idx)=> o[h] = r[idx] ?? "");
+            return o;
+          });
+          console.log("CSV import diagnostics:", {headerRow, headerSample: headers.slice(0,12)});
+          importRows(arr);
+        }catch(err){
+          console.error("CSV import error:", err);
+          alert(`CSV parse error: ${err.message || err}`);
+        }
+      };
+      reader.readAsText(f);
+      return;
+    }
+
+    // XLSX path (library available)
     const reader = new FileReader();
-    reader.onerror = () => alert("Could not read the file.");
+    reader.onerror = () => alert("Could not read the Excel file.");
     reader.onload = (e) => {
       try{
         const data = new Uint8Array(e.target.result);
@@ -572,14 +669,8 @@ window.handleFile = async function handleFile(){
 
         let headerRow = -1;
         for(let i=0;i<aoa.length;i++){
-          if(_looksLikeHeaderRow(aoa[i])){ headerRow = i; break; }
-        }
-        if(headerRow === -1){
-          // fallback: first non-empty row with >=3 cells
-          for(let i=0;i<aoa.length;i++){
-            const nonEmpty = aoa[i].filter(v => String(v).trim() !== "");
-            if(nonEmpty.length >= 3){ headerRow = i; break; }
-          }
+          const nonEmpty = aoa[i].filter(v => String(v).trim() !== "");
+          if(nonEmpty.length >= 3){ headerRow = i; break; }
         }
         if(headerRow === -1) throw new Error(`No plausible header row found in "${chosenSheet}".`);
 
@@ -591,21 +682,24 @@ window.handleFile = async function handleFile(){
           return o;
         });
 
-        console.log("Import diagnostics:", {sheet: chosenSheet, headerRow, headerSample: headers.slice(0,12)});
+        console.log("XLSX import diagnostics:", {sheet: chosenSheet, headerRow, headerSample: headers.slice(0,12)});
         importRows(arr);
       }catch(err){
-        console.error("Import error:", err);
+        console.error("Excel import error:", err);
         alert(`File parse error: ${err.message || err}`);
       }
     };
     reader.readAsArrayBuffer(f);
+
   } catch (e) {
     console.error(e);
     alert(e.message || String(e));
   }
 };
+</script>
 
-/* ======================= Import mapping & persist ======================= */
+  
+  /* ======================= Import mapping & persist ======================= */
 function importRows(arr){
   const batchId = document.getElementById("batchName").value.trim() || ("Batch_"+new Date().toISOString().slice(0,10));
   const batchType = document.getElementById("batchType").value;
