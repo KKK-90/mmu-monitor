@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>MMU-Monitoring Dashboard (Single-File, Phase-1)</title>
+<title>MMU-Monitoring Dashboard (Phase-1, Single File)</title>
 
-<!-- Essentials for GH Pages prototype -->
+<!-- Essentials (kept to CDN for GitHub Pages) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.3/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.3/jspdf.plugin.autotable.min.js"></script>
@@ -13,118 +13,121 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.13/dayjs.min.js"></script>
 
 <style>
-  /* ---------- THEMES ---------- */
   :root{
     --bg:#0f1420; --card:#121826; --ink:#eef2ff; --muted:#94a3b8;
-    --accent:#34d399; --accent2:#60a5fa; --glass:rgba(255,255,255,.06); --glass-br:rgba(255,255,255,.15);
-    --row-border:#22314e; --pill-good:#16a34a; --pill-warn:#f59e0b; --pill-info:#60a5fa; --pill-bad:#ef4444;
+    --accent:#34d399; --accent2:#60a5fa; --glass:rgba(255,255,255,0.06); --glass-br:rgba(255,255,255,0.15);
+    --border:#22314e; --hover:#0e172a; --head:#0b1220;
   }
-  html[data-theme="light"]{
-    --bg:#f6f8ff; --card:#ffffff; --ink:#0b1220; --muted:#5b6475;
-    --accent:#059669; --accent2:#2563eb; --glass:rgba(0,0,0,.04); --glass-br:rgba(0,0,0,.1);
-    --row-border:#e5e7eb; --pill-good:#15803d; --pill-warn:#b45309; --pill-info:#1d4ed8; --pill-bad:#b91c1c;
+  /* Light theme overrides (applied by .theme-light on body) */
+  body.theme-light{
+    --bg:#f5f7fb; --card:#ffffff; --ink:#0f172a; --muted:#475569;
+    --glass:rgba(0,0,0,0.04); --glass-br:rgba(0,0,0,0.12);
+    --border:#e5e7eb; --hover:#f3f4f6; --head:#f8fafc;
   }
 
-  /* ---------- BASE ---------- */
   *{box-sizing:border-box}
-  body{margin:0;background:linear-gradient(160deg,var(--bg), #131a2a40 40%, var(--bg));color:var(--ink);font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif}
+  body{margin:0;background:linear-gradient(160deg,var(--bg), var(--bg) 40%, var(--bg));color:var(--ink);
+       font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif; transition:background .2s,color .2s}
   header{position:sticky;top:0;z-index:30;backdrop-filter:blur(12px);
-    background:linear-gradient(90deg, var(--glass), transparent);
+    background:linear-gradient(90deg,var(--glass),transparent);
     border-bottom:1px solid var(--glass-br);padding:10px 14px;}
   .wrap{max-width:1200px;margin:0 auto;padding:16px}
-  .title{font-weight:800;letter-spacing:.3px;display:flex;gap:10px;align-items:center}
+  .title{font-weight:800;letter-spacing:.3px;display:flex;gap:10px;align-items:center;font-size:18px}
   .badge{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-br);color:var(--muted)}
   .tabs{display:flex;gap:6px;flex-wrap:wrap}
   .tab{padding:8px 12px;background:var(--glass);border:1px solid var(--glass-br);border-radius:999px;color:var(--ink);cursor:pointer;font-weight:600}
-  .tab.active{background:linear-gradient(180deg,rgba(52,211,153,.25),rgba(96,165,250,.18));border-color:var(--accent2)}
+  .tab.active{background:linear-gradient(180deg,rgba(52,211,153,.25),rgba(96,165,250,.18));border-color:#3b82f6}
   .grid{display:grid;gap:14px}
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
   .card{background:var(--card);border:1px solid var(--glass-br);border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.15)}
   .card h3{margin:0 0 8px 0;font-size:16px}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   .grow{flex:1 1 auto}
-  input,select,textarea,button{background:color-mix(in oklab,var(--card) 85%,#000 15%);color:var(--ink);border:1px solid var(--glass-br);border-radius:10px;padding:8px 10px}
+  input,select,textarea,button{background:color-mix(in oklab, var(--card) 75%, #0000);color:var(--ink);border:1px solid var(--glass-br);border-radius:10px;padding:8px 10px}
   input::placeholder{color:var(--muted)}
   button{cursor:pointer;font-weight:700}
-  .btn{background:linear-gradient(180deg, color-mix(in oklab,var(--accent) 30%, transparent), color-mix(in oklab,var(--accent2) 25%, transparent)); border-color:var(--accent2)}
-  .btn.red{background:linear-gradient(180deg, color-mix(in oklab,var(--pill-bad) 35%, transparent), color-mix(in oklab,var(--pill-warn) 25%, transparent)); border-color:var(--pill-bad)}
-  .btn.gray{background:linear-gradient(180deg, rgba(0,0,0,.06), rgba(0,0,0,.03))}
-  .btn.link{background:transparent;border:1px dashed var(--glass-br)}
+  .btn{background:linear-gradient(180deg,#34d39922,#60a5fa22);border-color:#3b82f6}
+  .btn.red{background:linear-gradient(180deg,#ef444422,#f59e0b22);border-color:#ef4444}
+  .btn.gray{background:linear-gradient(180deg,#00000010,#00000005)}
   .table-wrap{overflow:auto;border:1px solid var(--glass-br);border-radius:12px}
   table{border-collapse:separate;border-spacing:0;width:100%;min-width:900px}
-  th,td{padding:8px 10px;border-bottom:1px solid var(--row-border)} th{position:sticky;top:0;background:color-mix(in oklab,var(--card) 90%,#000 10%);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
-  tr:hover td{background:color-mix(in oklab,var(--card) 80%,#000 20%)}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--border)}
+  th{position:sticky;top:0;background:var(--head);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  tr:hover td{background:var(--hover)}
   .pill{padding:2px 6px;border-radius:999px;border:1px solid var(--glass-br);background:var(--glass);font-size:12px}
-  .status-delivered{background:color-mix(in oklab,var(--pill-good) 20%, transparent); border-color:var(--pill-good)}
-  .status-intransit{background:color-mix(in oklab,var(--pill-info) 20%, transparent); border-color:var(--pill-info)}
-  .status-pending{background:color-mix(in oklab,var(--pill-warn) 20%, transparent); border-color:var(--pill-warn)}
-  .status-exception{background:color-mix(in oklab,var(--pill-bad) 20%, transparent); border-color:var(--pill-bad)}
+  .status-delivered{background:#16a34a22;border-color:#16a34a}
+  .status-intransit{background:#60a5fa22;border-color:#60a5fa}
+  .status-pending{background:#f59e0b22;border-color:#f59e0b}
+  .status-exception{background:#ef444422;border-color:#ef4444}
   .muted{color:var(--muted)}
-  .sr{position:absolute;left:-9999px}
   .divider{height:1px;background:var(--glass-br);margin:12px 0}
-  .note{font-size:12px;color:var(--muted)}
-  .sticky-actions{position:sticky;bottom:0;background:linear-gradient(180deg,transparent 0%, color-mix(in oklab,var(--bg) 98%, #000 2%) 40%);padding-top:10px}
   .kpi{font-size:28px;font-weight:800}
   .right{margin-left:auto}
   .hidden{display:none!important}
 
-  /* ---------- LOGIN SCREEN ---------- */
-  #loginScreen{
-    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-    background:linear-gradient(160deg,var(--bg), #131a2a60 40%, var(--bg));
-    z-index:1000;
-  }
-  .login-card{
-    width:min(420px,92vw); background:var(--card); border:1px solid var(--glass-br); border-radius:16px; padding:20px;
-    box-shadow:0 20px 60px rgba(0,0,0,.35)
-  }
-  .login-card h1{margin:0 0 4px 0; font-size:20px}
-  .helper{font-size:12px; color:var(--muted)}
+  /* Login Screen */
+  .login-host{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .login-card{width:min(440px,92vw);background:var(--card);border:1px solid var(--glass-br);border-radius:16px;padding:24px;box-shadow:0 14px 40px rgba(0,0,0,.22)}
+  .login-card h1{margin:0 0 6px 0;font-size:22px}
+  .sub{font-size:13px;color:var(--muted);margin-bottom:16px}
+  .hint{font-size:12px;color:var(--muted)}
+  .err{color:#b91c1c;font-weight:700}
+  .eye{cursor:pointer;font-size:12px;color:var(--muted)}
 </style>
 </head>
-<body>
+<body class="theme-dark">
 
-<!-- ================= LOGIN ================= -->
-<div id="loginScreen">
+<!-- ======== LOGIN SCREEN (shown until authenticated) ======== -->
+<div id="loginScreen" class="login-host">
   <div class="login-card">
     <h1>MMU-Monitoring Dashboard</h1>
-    <div class="helper">Sign in to continue (prototype login, stored locally).</div>
-    <div class="divider"></div>
-    <div class="row"><label class="grow">Username <input id="loginUser" placeholder="username"/></label></div>
-    <div class="row"><label class="grow">Password <input id="loginPass" type="password" placeholder="password"/></label></div>
+    <div class="sub">Please sign in to continue.</div>
     <div class="row">
-      <button class="btn" onclick="doLogin()">Login</button>
-      <button class="btn gray right" onclick="fillDemo()">Use Demo (operator/Op@123)</button>
+      <label class="grow">Username
+        <input id="lgUser" placeholder="e.g., operator">
+      </label>
     </div>
+    <div class="row">
+      <label class="grow">Password
+        <div class="row" style="gap:6px">
+          <input id="lgPass" type="password" class="grow" placeholder="••••••••">
+          <span class="eye" onclick="togglePw()">Show/Hide</span>
+        </div>
+      </label>
+    </div>
+    <div class="row" style="justify-content:space-between">
+      <div class="hint">Default demo users: superadmin/admin/supervisor/operator/viewer</div>
+      <button class="btn" onclick="doLogin()">Sign in</button>
+    </div>
+    <div id="lgErr" class="err hidden"></div>
     <div class="divider"></div>
-    <div class="helper">Demo users → viewer/View@123, operator/Op@123, supervisor/Sup@123, admin/Admin@123, superadmin/Sa@123</div>
+    <div class="hint">Phase-1 prototype: credentials are checked locally (SHA-256). Phase-2 will connect to server auth.</div>
   </div>
 </div>
 
-<!-- ================= APP HEADER ================= -->
+<!-- ======== APP UI (hidden until authenticated) ======== -->
 <header id="appHeader" class="hidden">
   <div class="wrap row" style="justify-content:space-between;">
     <div class="title">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent)"><path d="M12 2l4 4-4 4-4-4 4-4zm0 6l4 4-4 4-4-4 4-4zm0 6l4 4-4 4-4-4 4-4z"/></svg>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#34d399"><path d="M12 2l4 4-4 4-4-4 4-4zm0 6l4 4-4 4-4-4 4-4zm0 6l4 4-4 4-4-4 4-4z"/></svg>
       <div>MMU-Monitoring Dashboard <span class="badge">Single-File Prototype</span></div>
     </div>
     <div class="row">
-      <button class="tab btn gray" id="themeBtn" title="Toggle theme" onclick="toggleTheme()">Light/Dark</button>
-      <span class="badge" id="userBadge">—</span>
+      <span class="badge">User: <span id="chipUser"></span> · Role: <b id="chipRole"></b></span>
       <span class="badge">Scope:
         <select id="scopeRegion" onchange="persistProfile();refreshAll()"><option value="">All Regions</option></select>
         <select id="scopeDivision" onchange="persistProfile();refreshAll()"><option value="">All Divisions</option></select>
       </span>
       <span class="badge">Local Time: <span id="clock"></span></span>
+      <button class="tab btn gray" onclick="toggleTheme()" id="themeBtn">Dark</button>
       <button class="tab btn gray" onclick="downloadBackup()">Backup</button>
       <label class="tab">Restore <input class="sr" type="file" accept=".json" onchange="restoreBackup(event)"><span class="badge">JSON</span></label>
-      <button class="tab btn red" onclick="logout()">Logout</button>
+      <button class="tab btn red" onclick="doLogout()">Logout</button>
     </div>
   </div>
 </header>
 
-<!-- ================= MAIN ================= -->
-<div id="appBody" class="wrap grid hidden">
+<div id="appMain" class="wrap grid hidden">
   <!-- Tabs -->
   <div class="tabs" id="tabs"></div>
 
@@ -139,19 +142,16 @@
         <option value="weekly">Weekly</option><option value="monthly" selected>Monthly</option>
       </select>
       <label class="row">Mode:
-        <select id="importMode">
-          <option value="append" selected>Append</option>
-          <option value="replace">Replace All</option>
-        </select>
+        <select id="importMode"><option value="append" selected>Append</option><option value="replace">Replace All</option></select>
       </label>
       <button class="btn" onclick="handleFile()">Import</button>
       <button class="btn gray" onclick="downloadTemplate('xlsx')">Template (XLSX)</button>
       <button class="btn gray" onclick="downloadTemplate('csv')">Template (CSV)</button>
     </div>
-    <div class="note">Appends by default and tags each record with <code>_batchId</code> and <code>_batchType</code>. “Replace All” clears data first.</div>
     <div class="divider"></div>
     <h3>Bulk Status Patch (CSV)</h3>
     <div class="row">
+      <label>Patch CSV (min: <code>article-number</code>, optional: <code>DELIVERY STATUS</code>, <code>DELIVERY DATE</code>)</label>
       <input type="file" id="patchFile" accept=".csv,.xlsx,.xls"/>
       <button class="btn" onclick="applyPatch()">Apply Patch</button>
       <button class="btn gray" onclick="downloadPatchSample()">Sample CSV</button>
@@ -162,7 +162,7 @@
   <section class="card" data-tab="Manual Entry">
     <h3>Manual Add / Edit</h3>
     <form id="manualForm" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));"></form>
-    <div class="row sticky-actions">
+    <div class="row">
       <button class="btn" onclick="saveManual()">Save Row</button>
       <button class="btn gray" onclick="document.getElementById('manualForm').reset()">Clear</button>
     </div>
@@ -192,9 +192,7 @@
       <input class="grow" id="q" placeholder="Search (name, article, office…)" oninput="renderTable()"/>
       <input type="date" id="fromDate" oninput="renderTable()"/>
       <input type="date" id="toDate" oninput="renderTable()"/>
-      <select id="fStatus" onchange="renderTable()">
-        <option value="">All Status</option><option>DELIVERED</option><option>IN-TRANSIT</option><option>PENDING</option><option>EXCEPTION</option>
-      </select>
+      <select id="fStatus" onchange="renderTable()"><option value="">All Status</option><option>DELIVERED</option><option>IN-TRANSIT</option><option>PENDING</option><option>EXCEPTION</option></select>
       <select id="fRegion" onchange="renderTable()"><option value="">All Regions</option></select>
       <select id="fDivision" onchange="renderTable()"><option value="">All Divisions</option></select>
       <select id="fBatch" onchange="renderTable()"><option value="">All Batches</option></select>
@@ -204,7 +202,7 @@
     </div>
     <div class="divider"></div>
     <div class="table-wrap"><table id="dataTable"></table></div>
-    <div class="row sticky-actions">
+    <div class="row">
       <label class="row">Bulk Status:
         <select id="bulkStatus">
           <option value="">— choose —</option><option>DELIVERED</option><option>IN-TRANSIT</option><option>PENDING</option><option>EXCEPTION</option>
@@ -212,7 +210,7 @@
       </label>
       <label class="row">Delivery Date: <input type="date" id="bulkDate"></label>
       <button class="btn" onclick="applyBulk()">Apply to Selected</button>
-      <button class="btn gray right" id="btnDelete" onclick="deleteSelected()">Delete Selected</button>
+      <button class="btn gray right hidden" id="btnDelete" onclick="deleteSelected()">Delete Selected</button>
     </div>
   </section>
 
@@ -221,7 +219,7 @@
     <h3>Template Manager</h3>
     <div class="note">Enable/disable, re-order columns. Uploads and forms follow this structure.</div>
     <div id="templateEditor" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:8px"></div>
-    <div class="row sticky-actions">
+    <div class="row">
       <button class="btn" onclick="downloadTemplate('xlsx')">Template (XLSX)</button>
       <button class="btn" onclick="downloadTemplate('csv')">Template (CSV)</button>
       <button class="btn gray" onclick="resetTemplate()">Reset to Default</button>
@@ -233,9 +231,12 @@
     <h3>Reports (Summary, Trend, Exceptions, Performance, Compliance, Custom)</h3>
     <div class="row">
       <select id="reportType" class="grow">
-        <option value="summary">Summary</option><option value="trend">Trend (daily/weekly/monthly)</option>
-        <option value="exceptions">Exceptions</option><option value="performance">Performance (SLA, avg time)</option>
-        <option value="compliance">Compliance (APT 2.0, mandatory)</option><option value="custom">Custom / User-defined</option>
+        <option value="summary">Summary</option>
+        <option value="trend">Trend (daily/weekly/monthly)</option>
+        <option value="exceptions">Exceptions</option>
+        <option value="performance">Performance (SLA, avg time)</option>
+        <option value="compliance">Compliance (APT 2.0, mandatory)</option>
+        <option value="custom">Custom / User-defined</option>
       </select>
       <button class="btn" onclick="buildReport()">Build</button>
       <button class="btn" onclick="reportExport('pdf')">PDF</button>
@@ -274,7 +275,7 @@
         <option value="DIVISION">DIVISION</option><option value="CUSTOMER">CUSTOMER</option>
         <option value="ARTICLE-TYPE">ARTICLE-TYPE</option>
       </select>
-      <input id="ruleKey" placeholder="Scope value (e.g., South, Belagavi, customer-id)"/>
+      <input id="ruleKey" placeholder="Scope value (e.g., South, Belagavi, customer-id…)"/>
       <input type="number" id="ruleHours" placeholder="SLA hours" min="1" style="width:140px"/>
       <button class="btn" onclick="addRule()">Add / Update Rule</button>
       <button class="btn gray" onclick="resetRules()">Reset</button>
@@ -286,10 +287,9 @@
   <!-- Audit -->
   <section class="card" data-tab="Audit">
     <h3>Audit Log</h3>
-    <div class="note">Every import, patch, manual add, bulk update, delete, complaint, settings/rules change is recorded here.</div>
     <div class="table-wrap"><table id="auditTable"></table></div>
-    <div class="row sticky-actions">
-      <button class="btn gray" onclick="downloadAudit()">Export Audit (CSV)</button>
+    <div class="row">
+      <button class="btn gray" onclick="downloadAudit()">Export Audit (CSV/Excel)</button>
       <button class="btn red" onclick="clearAudit()">Clear Audit</button>
     </div>
   </section>
@@ -298,7 +298,7 @@
   <section class="card" data-tab="Settings">
     <h3>Settings</h3>
     <div class="row">
-      <label>Default Period:
+      <label>Default Report Period:
         <select id="defaultPeriod" onchange="persistSettings()">
           <option value="daily">Daily</option><option value="weekly">Weekly</option>
           <option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annual</option>
@@ -314,7 +314,7 @@
 </div>
 
 <script>
-/* ===================== KEYS & CONSTANTS ===================== */
+/* ======================= Local Keys & Constants ======================= */
 const DEFAULT_COLUMNS = [
   "customer-id","customer-name","customer-type-id","customer-type","contract-id",
   "payment-mode-code","payment_mode_description","book-channel-id","book-channel-name",
@@ -328,88 +328,105 @@ const DEFAULT_COLUMNS = [
 const REQUIRED = ["article-number","booking-date-time","booking-office-name","Region","Division","DELIVERY STATUS"];
 
 const LS = {
-  ROWS:"as_rows_v2", TEMPLATE:"as_template_v2", COMPLAINTS:"as_complaints_v2",
-  SETTINGS:"as_settings_v2", RULES:"as_rules_v1", AUDIT:"as_audit_v1",
-  PROFILE:"as_profile_v1", USERS:"as_users_v1", THEME:"as_theme_v1", SESSION:"as_session_v1"
+  ROWS:"as_rows_v2",
+  TEMPLATE:"as_template_v2",
+  COMPLAINTS:"as_complaints_v2",
+  SETTINGS:"as_settings_v2",
+  RULES:"as_rules_v1",
+  AUDIT:"as_audit_v1",
+  PROFILE:"as_profile_v1",
+  USERS:"as_users_v1",
+  SESSION:"as_session_v1",
+  THEME:"as_theme_v1"
 };
 
 const ROLE = { Viewer:0, Operator:1, Supervisor:2, Admin:3, Superadmin:4 };
-const DEFAULT_USERS = [
-  {username:"viewer",     password:"View@123", role:"Viewer",     display:"Viewer"},
-  {username:"operator",   password:"Op@123",   role:"Operator",   display:"Operator"},
-  {username:"supervisor", password:"Sup@123",  role:"Supervisor", display:"Supervisor"},
-  {username:"admin",      password:"Admin@123",role:"Admin",      display:"Admin"},
-  {username:"superadmin", password:"Sa@123",   role:"Superadmin", display:"Superadmin"}
-];
 
-/* =============== GLOBAL STATE =============== */
-let rows=[], template=[], complaints=[], rules=[], audit=[], profile={role:"Viewer", region:"", division:"", user:""};
+let rows=[], template=[], complaints=[], rules=[], audit=[];
+let profile={username:"", role:"Operator", region:"", division:""};
 let settings={ defaultPeriod:"monthly", allowDelete:"role" };
-let charts={}, session=null;
+let charts={};
+const $ = (id)=>document.getElementById(id);
 
-/* =============== HELPERS =============== */
-const $ = id => document.getElementById(id);
+/* ======================= Auth (client-side prototype) ======================= */
+function enc(s){ return new TextEncoder().encode(s); }
+async function sha256(text){
+  const buf = await crypto.subtle.digest("SHA-256", enc(text));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+function seedUsersIfEmpty(){
+  const current = JSON.parse(localStorage.getItem(LS.USERS)||"[]");
+  if(current.length) return;
+  // Pre-seeded demo users (passwords hashed at runtime and saved)
+  const seeds = [
+    {u:"superadmin", r:"Superadmin", p:"Super@123"},
+    {u:"admin", r:"Admin", p:"Admin@123"},
+    {u:"supervisor", r:"Supervisor", p:"Supv@123"},
+    {u:"operator", r:"Operator", p:"Oper@123"},
+    {u:"viewer", r:"Viewer", p:"View@123"}
+  ];
+  Promise.all(seeds.map(async s => ({user:s.u, role:s.r, hash:await sha256(s.p)})))
+    .then(final => { localStorage.setItem(LS.USERS, JSON.stringify(final)); });
+}
+function showAppUI(show){
+  $("loginScreen").classList.toggle("hidden", show);
+  $("appHeader").classList.toggle("hidden", !show);
+  $("appMain").classList.toggle("hidden", !show);
+}
+async function doLogin(){
+  const u = $("lgUser").value.trim();
+  const p = $("lgPass").value;
+  const users = JSON.parse(localStorage.getItem(LS.USERS)||"[]");
+  const found = users.find(x=>x.user===u);
+  if(!found){ return showLoginError("Invalid username or password."); }
+  const h = await sha256(p);
+  if(h !== found.hash){ return showLoginError("Invalid username or password."); }
+  // success
+  profile.username = u; profile.role = found.role;
+  localStorage.setItem(LS.PROFILE, JSON.stringify(profile));
+  localStorage.setItem(LS.SESSION, JSON.stringify({user:u, ts:Date.now()}));
+  $("chipUser").textContent = u; $("chipRole").textContent = profile.role;
+  showAppUI(true); applyRole(); refreshAll(); logAudit("auth.login",{user:u});
+}
+function doLogout(){
+  localStorage.removeItem(LS.SESSION);
+  logAudit("auth.logout",{user:profile.username});
+  location.reload();
+}
+function showLoginError(msg){
+  const el=$("lgErr"); el.textContent=msg; el.classList.remove("hidden");
+  setTimeout(()=>el.classList.add("hidden"), 4000);
+}
+function togglePw(){ const i=$("lgPass"); i.type = (i.type==="password"?"text":"password"); }
+
+/* ======================= Theme ======================= */
+function loadTheme(){
+  const t = localStorage.getItem(LS.THEME) || "dark";
+  document.body.classList.toggle("theme-light", t==="light");
+  document.body.classList.toggle("theme-dark", t!=="light");
+  $("themeBtn").textContent = (t==="light"?"Light":"Dark");
+}
+function toggleTheme(){
+  const cur = localStorage.getItem(LS.THEME) || "dark";
+  const next = (cur==="light" ? "dark" : "light");
+  localStorage.setItem(LS.THEME, next);
+  loadTheme();
+}
+
+/* ======================= Core store & settings ======================= */
 function tickClock(){ $("clock").textContent = new Date().toLocaleString(); }
 setInterval(tickClock, 1000); tickClock();
 
-/* =============== AUTH =============== */
-function ensureUsers(){
-  const u = JSON.parse(localStorage.getItem(LS.USERS)||"null");
-  if(!u) localStorage.setItem(LS.USERS, JSON.stringify(DEFAULT_USERS));
-}
-function doLogin(){
-  ensureUsers();
-  const u = $("loginUser").value.trim(), p = $("loginPass").value;
-  const users = JSON.parse(localStorage.getItem(LS.USERS)||"[]");
-  const hit = users.find(x=> x.username===u && x.password===p);
-  if(!hit){ alert("Invalid credentials"); return; }
-  session = { username:hit.username, role:hit.role, display:hit.display };
-  localStorage.setItem(LS.SESSION, JSON.stringify(session));
-  profile = { role:hit.role, user:hit.username, region:"", division:"" };
-  localStorage.setItem(LS.PROFILE, JSON.stringify(profile));
-  logAudit("auth.login",{user:hit.username, role:hit.role});
-  postLoginUI();
-}
-function fillDemo(){ $("loginUser").value="operator"; $("loginPass").value="Op@123"; }
-function logout(){
-  logAudit("auth.logout",{user:session?.username});
-  session=null; localStorage.removeItem(LS.SESSION);
-  document.getElementById("loginScreen").style.display="flex";
-  document.getElementById("appHeader").classList.add("hidden");
-  document.getElementById("appBody").classList.add("hidden");
-}
-function postLoginUI(){
-  $("userBadge").textContent = `${session.display} (${session.role})`;
-  document.getElementById("loginScreen").style.display="none";
-  document.getElementById("appHeader").classList.remove("hidden");
-  document.getElementById("appBody").classList.remove("hidden");
-  bootAppAfterAuth();
-}
-
-/* =============== THEME =============== */
-function applyTheme(t){
-  document.documentElement.setAttribute("data-theme", t);
-  localStorage.setItem(LS.THEME, t);
-  $("themeBtn").textContent = (t==="dark")?"Light":"Dark";
-}
-function toggleTheme(){
-  const cur = document.documentElement.getAttribute("data-theme") || "dark";
-  applyTheme(cur==="dark"?"light":"dark");
-}
-
-/* =============== LOAD/PERSIST =============== */
 function loadAll(){
   rows = JSON.parse(localStorage.getItem(LS.ROWS)||"[]");
   template = JSON.parse(localStorage.getItem(LS.TEMPLATE)||"null") || DEFAULT_COLUMNS.map(k=>({key:k,label:k,enabled:true}));
   complaints = JSON.parse(localStorage.getItem(LS.COMPLAINTS)||"[]");
   rules = JSON.parse(localStorage.getItem(LS.RULES)||"[]");
   audit = JSON.parse(localStorage.getItem(LS.AUDIT)||"[]");
-  const prof = JSON.parse(localStorage.getItem(LS.PROFILE)||"null");
-  if(prof) profile = Object.assign(profile, prof);
-  const theme = localStorage.getItem(LS.THEME) || "dark";
-  applyTheme(theme);
-  const sess = JSON.parse(localStorage.getItem(LS.SESSION)||"null");
-  if(sess){ session=sess; postLoginUI(); }
+  settings = Object.assign(settings, JSON.parse(localStorage.getItem(LS.SETTINGS)||"{}"));
+
+  $("defaultPeriod").value = settings.defaultPeriod||"monthly";
+  $("allowDelete").value = settings.allowDelete||"role";
 }
 function persist(){ localStorage.setItem(LS.ROWS, JSON.stringify(rows)); }
 function saveTemplate(){ localStorage.setItem(LS.TEMPLATE, JSON.stringify(template)); }
@@ -429,8 +446,8 @@ function persistProfile(){
   localStorage.setItem(LS.PROFILE, JSON.stringify(profile));
 }
 
-/* =============== RBAC =============== */
-function roleLevel(){ return ROLE[profile.role] ?? ROLE.Viewer; }
+/* ======================= RBAC Helpers ======================= */
+function roleLevel(){ return ROLE[profile.role] ?? ROLE.Operator; }
 function can(action){
   const lvl = roleLevel();
   const matrix = {
@@ -441,12 +458,14 @@ function can(action){
   return lvl >= (matrix[action] ?? 99);
 }
 function applyRole(){
+  $("chipUser").textContent = profile.username || "-";
+  $("chipRole").textContent = profile.role || "Operator";
   document.querySelector('[data-tab="Templates"]').classList.toggle("hidden", !can("templateEdit"));
   document.querySelector('[data-tab="SLA Rules"]').classList.toggle("hidden", !can("rulesEdit"));
   $("btnDelete").classList.toggle("hidden", !can("delete"));
 }
 
-/* =============== TABS =============== */
+/* ======================= Tabs ======================= */
 const TAB_ORDER = ["Upload","Manual Entry","Dashboard","Browse","Templates","Reports","Complaints","Alerts","SLA Rules","Audit","Settings"];
 function buildTabs(){
   const host=$("tabs"); host.innerHTML="";
@@ -467,7 +486,7 @@ function activateTab(name,btn){
   });
 }
 
-/* =============== IMPORT / PATCH =============== */
+/* ======================= Upload / Import & Patch ======================= */
 function handleFile(){
   if(!can("import")) return alert("Not allowed by role.");
   const file=$("fileInput").files[0];
@@ -513,8 +532,8 @@ function importRows(arr){
   });
 
   persist(); refreshAll();
-  logAudit("import", {user:session.username, batchId,batchType,mode,added:add,duplicates:dup,missing:miss});
-  alert(`Imported ${add} row(s).\nDuplicates skipped: ${dup}\nMissing requireds flagged: ${miss}\nBatch: ${batchId} (${batchType})`);
+  logAudit("import", {batchId,batchType,mode,added:add,duplicates:dup,missing:miss});
+  alert(`Imported ${add} row(s).\nDuplicates: ${dup}\nMissing requireds flagged: ${miss}\nBatch: ${batchId} (${batchType})`);
 }
 function downloadTemplate(fmt){
   const cols=template.filter(c=>c.enabled).map(c=>c.label||c.key);
@@ -556,13 +575,13 @@ function applyPatch(){
       applied++;
     });
     persist(); refreshAll();
-    logAudit("patch.apply",{user:session.username, applied,missing});
+    logAudit("patch.apply",{applied,missing});
     alert(`Patch applied.\nUpdated: ${applied}\nNot found: ${missing}`);
   };
   reader.readAsArrayBuffer(file);
 }
 
-/* =============== MANUAL ENTRY & BROWSE =============== */
+/* ======================= Manual Entry ======================= */
 function buildManualForm(){
   const host=$("manualForm"); host.innerHTML="";
   template.filter(c=>c.enabled).forEach(col=>{
@@ -592,10 +611,11 @@ function saveManual(){
   rec._batchId = "Manual_"+new Date().toISOString();
   rec._batchType = "manual";
   rows.push(rec); persist(); form.reset(); refreshAll();
-  logAudit("manual.add",{user:session.username, article:k});
+  logAudit("manual.add",{article:k});
   alert("Saved.");
 }
 
+/* ======================= Filtering / Browse ======================= */
 function scopeFilter(r){
   if(profile.region && r.Region !== profile.region) return false;
   if(profile.division && r.Division !== profile.division) return false;
@@ -605,10 +625,7 @@ function getFilters(){
   const q=$("q").value.trim().toLowerCase();
   const from=$("fromDate").value? dayjs($("fromDate").value):null;
   const to=$("toDate").value? dayjs($("toDate").value):null;
-  const st=$("fStatus").value;
-  const reg=$("fRegion").value;
-  const div=$("fDivision").value;
-  const batch=$("fBatch").value;
+  const st=$("fStatus").value; const reg=$("fRegion").value; const div=$("fDivision").value; const batch=$("fBatch").value;
   return {q,from,to,st,reg,div,batch};
 }
 function passFilters(r, F){
@@ -619,7 +636,6 @@ function passFilters(r, F){
   if(F.reg && String(r["Region"]||"")!==F.reg) return false;
   if(F.div && String(r["Division"]||"")!==F.div) return false;
   if(F.batch && String(r["_batchId"]||"")!==F.batch) return false;
-
   if(F.from || F.to){
     const raw=String(r["booking-date-time"]||"").substring(0,10);
     const d=dayjs(raw || r["booking-date-time"]);
@@ -636,7 +652,6 @@ function buildOptions(){
   $("fDivision").innerHTML='<option value="">All Divisions</option>'+divs.map(x=>`<option>${x}</option>`).join("");
   $("fBatch").innerHTML='<option value="">All Batches</option>'+batches.map(x=>`<option>${x}</option>`).join("");
 
-  // header scope selectors
   $("scopeRegion").innerHTML='<option value="">All Regions</option>'+regs.map(x=>`<option ${x===profile.region?"selected":""}>${x}</option>`).join("");
   $("scopeDivision").innerHTML='<option value="">All Divisions</option>'+divs.map(x=>`<option ${x===profile.division?"selected":""}>${x}</option>`).join("");
 }
@@ -645,7 +660,9 @@ function renderTable(){
   const cols=template.filter(c=>c.enabled).map(c=>c.key);
   const tbl=$("dataTable"); tbl.innerHTML="";
   const thead=document.createElement("thead");
-  thead.innerHTML=`<tr><th><input type="checkbox" onclick="toggleAll(this)"></th>${cols.map(k=>`<th>${k}</th>`).join("")}</tr>`;
+  thead.innerHTML=`<tr><th><input type="checkbox" onclick="toggleAll(this)"></th>${
+    cols.map(k=>`<th>${k}</th>`).join("")
+  }</tr>`;
   tbl.appendChild(thead);
 
   const tbody=document.createElement("tbody");
@@ -679,7 +696,7 @@ function applyBulk(){
   if(ids.length===0) return alert("Select rows first.");
   ids.forEach(i=>{ if(status) rows[i]["DELIVERY STATUS"]=status; if(d) rows[i]["DELIVERY DATE"]=d; });
   persist(); refreshAll();
-  logAudit("bulk.update",{user:session.username, count:ids.length,status,date:d});
+  logAudit("bulk.update",{count:ids.length,status,date:d});
   alert("Bulk update applied.");
 }
 function deleteSelected(){
@@ -689,10 +706,10 @@ function deleteSelected(){
   if(!confirm(`Delete ${ids.size} selected row(s)?`)) return;
   rows=rows.filter((r,idx)=>!ids.has(idx));
   persist(); refreshAll();
-  logAudit("rows.delete",{user:session.username, count:ids.size});
+  logAudit("rows.delete",{count:ids.size});
 }
 
-/* =============== EXPORTS =============== */
+/* ======================= Exports & PDF ======================= */
 function exportTable(fmt){
   const F=getFilters();
   const cols=template.filter(c=>c.enabled).map(c=>c.key);
@@ -721,10 +738,19 @@ function exportPDF(){
   doc.save("browse_export.pdf");
 }
 
-/* =============== DASHBOARD / CHARTS =============== */
+/* ======================= Dashboard / Charts ======================= */
 function slaHoursFor(r){
-  const look = [["CUSTOMER", r["customer-id"]],["ARTICLE-TYPE", r["article-type"]],["DIVISION", r["Division"]],["REGION", r["Region"]],["GLOBAL","GLOBAL"]];
-  for(const [scope,key] of look){ const hit=rules.find(x=>x.scope===scope && String(x.key||"")===String(key||"")); if(hit) return +hit.hours; }
+  const look = [
+    ["CUSTOMER", r["customer-id"]],
+    ["ARTICLE-TYPE", r["article-type"]],
+    ["DIVISION", r["Division"]],
+    ["REGION", r["Region"]],
+    ["GLOBAL","GLOBAL"]
+  ];
+  for(const [scope,key] of look){
+    const hit = rules.find(x=>x.scope===scope && String(x.key||"")===String(key||""));
+    if(hit) return +hit.hours;
+  }
   return 72;
 }
 function refreshKPIs(){
@@ -735,14 +761,14 @@ function refreshKPIs(){
     const st=String(r["DELIVERY STATUS"]||"").toUpperCase();
     if(st==="DELIVERED"||st==="EXCEPTION") return false;
     const dt=dayjs(r["booking-date-time"]); if(!dt.isValid()) return false;
-    return dayjs().diff(dt,"hour") > slaHoursFor(r);
+    const limit = slaHoursFor(r);
+    return dayjs().diff(dt,"hour") > limit;
   }).length;
   const exception=inScope.filter(r=>String(r["DELIVERY STATUS"]||"").toUpperCase()==="EXCEPTION").length;
   $("kpiTotal").textContent=total; $("kpiDelivered").textContent=delivered;
   $("kpiAged").textContent=aged; $("kpiException").textContent=exception;
 }
-let chartsRef={};
-function chart(id,cfg){ if(chartsRef[id]) chartsRef[id].destroy(); chartsRef[id]=new Chart(document.getElementById(id),cfg); }
+function chart(id,cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart(document.getElementById(id),cfg); }
 function refreshCharts(){
   const inScope = rows.filter(r=>scopeFilter(r));
   const st=["DELIVERED","IN-TRANSIT","PENDING","EXCEPTION"];
@@ -757,18 +783,273 @@ function refreshCharts(){
       onClick:(e,els)=>{ if(els[0]){$("fRegion").value=regs[els[0].index]; activateTab("Browse",document.querySelectorAll(".tab")[3]); renderTable();}}}});
   const map={}; inScope.forEach(r=>{ const d=(String(r["booking-date-time"]||"").substring(0,10))||""; if(!d) return; map[d]=(map[d]||0)+1; });
   const dates=Object.keys(map).sort();
-  chart("chartTrend",{type:"line",data:{labels:dates,datasets:[{label:"Articles",data:dates.map(d=>map[d])}]},options:{plugins:{legend:{display:false}}}});
+  chart("chartTrend",{type:"line",data:{labels:dates,datasets:[{label:"Articles",data:dates.map(d=>map[d])}]},
+    options:{plugins:{legend:{display:false}}}});
 }
 
-/* =============== REPORTS / RULES / AUDIT / TEMPLATE =============== */
+/* ======================= Reports & helpers ======================= */
 function buildReport(){
-  const type=$("reportType").value; const host=$("reportTable"); host.innerHTML="";
+  const type=$("reportType").value;
+  const host=$("reportTable"); host.innerHTML="";
   const makeRow=(arr)=>"<tr>"+arr.map(x=>`<td>${x}</td>`).join("")+"</tr>";
   const inScope=rows.filter(r=>scopeFilter(r));
+
   if(type==="summary"){
     const total=inScope.length;
     const byStatus=["DELIVERED","IN-TRANSIT","PENDING","EXCEPTION"].map(s=>[s,inScope.filter(r=>String(r["DELIVERY STATUS"]||"").toUpperCase()===s).length]);
-    const byRegion=countBy("Region", inScope); const byDivision=countBy("Division", inScope);
+    const byRegion=countBy("Region", inScope);
+    const byDivision=countBy("Division", inScope);
     host.innerHTML=`<thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>
-      ${makeRow(["Total Articles",total])}${byStatus.map(x=>makeRow([x[0],x[1]])).join("")}
-      <tr><th colspan="2">By Region</th></tr>${byRegion.map(x=>makeRow(x)).join
+      ${makeRow(["Total Articles",total])}
+      ${byStatus.map(x=>makeRow([x[0],x[1]])).join("")}
+      <tr><th colspan="2">By Region</th></tr>${byRegion.map(x=>makeRow(x)).join("")}
+      <tr><th colspan="2">By Division</th></tr>${byDivision.map(x=>makeRow(x)).join("")}
+    </tbody>`;
+  } else if(type==="trend"){
+    const period=settings.defaultPeriod;
+    const buckets={};
+    inScope.forEach(r=>{
+      const d=dayjs(r["booking-date-time"]); if(!d.isValid()) return;
+      let key=d.format("YYYY-MM-DD");
+      if(period==="weekly") key=d.startOf("week").format("YYYY-[W]WW");
+      if(period==="monthly") key=d.format("YYYY-MM");
+      if(period==="quarterly") key=d.format("YYYY-[Q]Q");
+      if(period==="annual") key=d.format("YYYY");
+      buckets[key]=(buckets[key]||0)+1;
+    });
+    const keys=Object.keys(buckets).sort();
+    host.innerHTML=`<thead><tr><th>Period</th><th>Articles</th></tr></thead><tbody>
+      ${keys.map(k=>makeRow([k,buckets[k]])).join("")}
+    </tbody>`;
+  } else if(type==="exceptions"){
+    const missing=inScope.filter(r=> REQUIRED.some(k=>!String(r[k]||"").trim()));
+    const seen=new Set(); const dups=[];
+    inScope.forEach(r=>{ const k=String(r["article-number"]||""); if(!k) return; if(seen.has(k)) dups.push(r); else seen.add(k); });
+    const aged=inScope.filter(r=>{
+      const st=String(r["DELIVERY STATUS"]||"").toUpperCase();
+      if(st==="DELIVERED"||st==="EXCEPTION") return false;
+      const d=dayjs(r["booking-date-time"]); if(!d.isValid()) return false;
+      return dayjs().diff(d,"hour") > slaHoursFor(r);
+    });
+    host.innerHTML=`<thead><tr><th>Exception</th><th>Count</th></tr></thead><tbody>
+      ${makeRow(["Missing requireds",missing.length])}
+      ${makeRow(["Duplicates (article-number)",dups.length])}
+      ${makeRow(["Aged pending (> SLA)",aged.length])}
+    </tbody>`;
+  } else if(type==="performance"){
+    const delivered=inScope.filter(r=>String(r["DELIVERY STATUS"]||"").toUpperCase()==="DELIVERED");
+    const deltas=delivered.map(r=>{
+      const b=dayjs(r["booking-date-time"]); const d=dayjs(r["DELIVERY DATE"]);
+      if(!b.isValid()||!d.isValid()) return null; return d.diff(b,"hour");
+    }).filter(x=>x!=null);
+    const avg=deltas.length? Math.round(deltas.reduce((a,b)=>a+b,0)/deltas.length) : 0;
+    host.innerHTML=`<thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>
+      ${makeRow(["Delivered count", delivered.length])}
+      ${makeRow(["Avg hours to deliver", avg])}
+    </tbody>`;
+  } else if(type==="compliance"){
+    const aptMissing=inScope.filter(r=> String(r["APT 2.O updation"]||"").trim()==="");
+    const mandatoryMissing=inScope.filter(r=> REQUIRED.some(k=>!String(r[k]||"").trim()));
+    host.innerHTML=`<thead><tr><th>Check</th><th>Fail Count</th></tr></thead><tbody>
+      ${makeRow(["APT 2.0 field empty", aptMissing.length])}
+      ${makeRow(["Mandatory fields empty", mandatoryMissing.length])}
+    </tbody>`;
+  } else {
+    const cols=template.filter(c=>c.enabled).map(c=>c.key);
+    const head="<thead><tr>"+cols.map(c=>`<th>${c}</th>`).join("")+"</tr></thead>";
+    const body="<tbody>"+inScope.map(r=>"<tr>"+cols.map(c=>`<td>${r[c]??""}</td>`).join("")+"</tr>").join("")+"</tbody>";
+    $("reportTable").innerHTML=head+body;
+  }
+}
+function reportExport(fmt){
+  const tbl=$("reportTable"); if(!tbl.rows.length) return alert("Build a report first.");
+  const headers=[...tbl.querySelectorAll("thead th")].map(th=>th.textContent);
+  const body=[...tbl.querySelectorAll("tbody tr")].map(tr=>[...tr.children].map(td=>td.textContent));
+  if(fmt==="pdf"){
+    const { jsPDF }=window.jspdf; const doc=new jsPDF({orientation:"landscape"});
+    doc.text("Report",14,12); doc.autoTable({head:[headers],body,startY:16,styles:{fontSize:8}}); doc.save("report.pdf");
+  } else if(fmt==="xlsx"){
+    const json=body.map(row=> Object.fromEntries(row.map((v,i)=>[headers[i],v])));
+    const ws=XLSX.utils.json_to_sheet(json); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Report"); XLSX.writeFile(wb,"report.xlsx");
+  } else {
+    const ws=XLSX.utils.aoa_to_sheet([headers,...body]); const csv=XLSX.utils.sheet_to_csv(ws);
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="report.csv"; a.click();
+  }
+}
+function countBy(key, arr=rows){ const map={}; arr.forEach(r=>{ const k=r[key]||"—"; map[k]=(map[k]||0)+1; }); return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0])); }
+
+/* ======================= Complaints, Alerts, Rules, Audit ======================= */
+function renderComplaints(){
+  const tbl=$("cmpTable");
+  tbl.innerHTML=`<thead><tr><th>Article</th><th>Type</th><th>Description</th><th>Logged</th></tr></thead><tbody>`+
+    complaints.map(c=>`<tr><td class="link" onclick="focusArticle('${c.article}')">${c.article}</td><td>${c.type}</td><td>${c.desc}</td><td>${c.ts}</td></tr>`).join("") + `</tbody>`;
+}
+function addComplaint(){
+  const a=$("cmpArticle").value.trim(); const t=$("cmpType").value.trim(); const d=$("cmpDesc").value.trim();
+  if(!a||!t) return alert("Article and Type are required.");
+  complaints.push({article:a,type:t,desc:d,ts:new Date().toLocaleString()});
+  saveComplaints(); $("cmpArticle").value=""; $("cmpType").value=""; $("cmpDesc").value=""; renderComplaints();
+  logAudit("complaint.add",{article:a,type:t});
+}
+function focusArticle(article){ $("q").value=article; activateTab("Browse", document.querySelectorAll(".tab")[3]); renderTable(); }
+
+function renderAlerts(){
+  const list=$("alertsList"); list.innerHTML="";
+  const missing=rows.filter(r=> REQUIRED.some(k=>!String(r[k]||"").trim()));
+  const dupKeys=new Set(); const seen=new Set();
+  rows.forEach(r=>{ const k=String(r["article-number"]||""); if(!k) return; if(seen.has(k)) dupKeys.add(k); else seen.add(k); });
+  const aged=rows.filter(r=>{
+    const st=String(r["DELIVERY STATUS"]||"").toUpperCase();
+    if(st==="DELIVERED"||st==="EXCEPTION") return false;
+    const d=dayjs(r["booking-date-time"]); if(!d.isValid()) return false;
+    return dayjs().diff(d,"hour") > slaHoursFor(r);
+  });
+  const alerts=[
+    {label:`Missing requireds: ${missing.length}`, action:()=>alert("See Reports → Exceptions for details.")},
+    {label:`Duplicate article-number: ${dupKeys.size}`, action:()=>alert("See Reports → Exceptions for details.")},
+    {label:`Aged pending (> SLA): ${aged.length}`, action:()=>{ $("fStatus").value="PENDING"; activateTab("Browse",document.querySelectorAll(".tab")[3]); renderTable(); }}
+  ];
+  alerts.forEach(a=>{ const div=document.createElement("div"); div.className="card link"; div.textContent=a.label; div.onclick=a.action; list.appendChild(div); });
+}
+
+function buildRuleTable(){
+  const tbl=$("ruleTable");
+  tbl.innerHTML=`<thead><tr><th>Scope</th><th>Key</th><th>SLA (h)</th><th></th></tr></thead><tbody>`+
+    rules.map((r,i)=>`<tr><td>${r.scope}</td><td>${r.key}</td><td>${r.hours}</td><td><button class="btn red" onclick="delRule(${i})">Delete</button></td></tr>`).join("")+`</tbody>`;
+}
+function addRule(){
+  if(!can("rulesEdit")) return alert("Not allowed by role.");
+  const scope=$("ruleScope").value;
+  const key=$("ruleKey").value.trim() || (scope==="GLOBAL"?"GLOBAL":"");
+  const hours=+($("ruleHours").value||"0"); if(!hours) return alert("Enter SLA hours.");
+  const i=rules.findIndex(r=>r.scope===scope && String(r.key)===String(key));
+  const rec={scope,key,hours};
+  if(i>=0) rules[i]=rec; else rules.push(rec);
+  saveRules(); buildRuleTable(); refreshAll();
+  logAudit("rules.upsert",{scope,key,hours});
+}
+function delRule(i){
+  if(!can("rulesEdit")) return alert("Not allowed by role.");
+  const {scope,key}=rules[i]||{};
+  rules.splice(i,1); saveRules(); buildRuleTable(); refreshAll();
+  logAudit("rules.delete",{scope,key});
+}
+function resetRules(){
+  if(!can("rulesEdit")) return alert("Not allowed by role.");
+  rules=[{scope:"GLOBAL",key:"GLOBAL",hours:72}]; saveRules(); buildRuleTable(); refreshAll();
+  logAudit("rules.reset",{});
+}
+
+function logAudit(event, detail){
+  const row={ts:new Date().toISOString(), user:profile.username, userRole:profile.role, region:profile.region, division:profile.division, event, detail};
+  audit.unshift(row); saveAudit();
+}
+function renderAudit(){
+  const tbl=$("auditTable");
+  tbl.innerHTML=`<thead><tr><th>Timestamp</th><th>User</th><th>Role</th><th>Region</th><th>Division</th><th>Event</th><th>Detail</th></tr></thead><tbody>`+
+    audit.map(a=>`<tr><td>${a.ts}</td><td>${a.user||"—"}</td><td>${a.userRole}</td><td>${a.region||"—"}</td><td>${a.division||"—"}</td><td>${a.event}</td><td>${JSON.stringify(a.detail||{})}</td></tr>`).join("")+`</tbody>`;
+}
+function downloadAudit(){
+  const ws=XLSX.utils.json_to_sheet(audit); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Audit"); XLSX.writeFile(wb,"audit_log.xlsx");
+}
+function clearAudit(){
+  if(!can("auditClear")) return alert("Not allowed by role.");
+  if(!confirm("Clear entire audit log?")) return;
+  audit=[]; saveAudit(); renderAudit();
+}
+
+/* ======================= Template Editor & Backup ======================= */
+function resetTemplate(){
+  if(!confirm("Reset template to default?")) return;
+  template=DEFAULT_COLUMNS.map(k=>({key:k,label:k,enabled:true}));
+  saveTemplate(); buildTemplateEditor(); refreshAll(); logAudit("template.reset",{});
+}
+function buildTemplateEditor(){
+  const host=$("templateEditor"); host.innerHTML="";
+  template.forEach((col,idx)=>{
+    const card=document.createElement("div"); card.className="card";
+    const disabled = !can("templateEdit");
+    card.innerHTML=`
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <strong>${col.key}</strong>
+        <label class="row">Enabled <input type="checkbox" ${col.enabled?"checked":""} data-idx="${idx}" ${disabled?"disabled":""}/></label>
+      </div>
+      <div class="row">
+        <label class="grow">Label <input data-lbl="${idx}" value="${col.label}" ${disabled?"disabled":""}></label>
+      </div>
+      <div class="row">
+        <button class="btn gray" data-up="${idx}" ${disabled?"disabled":""}>↑</button>
+        <button class="btn gray" data-down="${idx}" ${disabled?"disabled":""}>↓</button>
+        <button class="btn red" data-del="${idx}" ${disabled?"disabled":""}>Remove</button>
+      </div>`;
+    host.appendChild(card);
+  });
+  if(!can("templateEdit")) return;
+  host.querySelectorAll("input[type=checkbox]").forEach(ch=>{
+    ch.onchange=(e)=>{ const i=+e.target.dataset.idx; template[i].enabled=e.target.checked; saveTemplate(); refreshAll(); logAudit("template.toggle",{key:template[i].key,enabled:e.target.checked}); };
+  });
+  host.querySelectorAll("[data-lbl]").forEach(inp=>{
+    inp.oninput=(e)=>{ const i=+e.target.dataset.lbl; template[i].label=e.target.value; saveTemplate(); logAudit("template.label",{key:template[i].key,label:e.target.value}); };
+  });
+  host.querySelectorAll("[data-up]").forEach(b=> b.onclick=()=>{ const i=+b.dataset.up; if(i>0){ [template[i-1],template[i]]=[template[i],template[i-1]]; saveTemplate(); buildTemplateEditor(); refreshAll(); logAudit("template.reorder",{from:i,to:i-1}); }});
+  host.querySelectorAll("[data-down]").forEach(b=> b.onclick=()=>{ const i=+b.dataset.down; if(i<template.length-1){ [template[i+1],template[i]]=[template[i],template[i+1]]; saveTemplate(); buildTemplateEditor(); refreshAll(); logAudit("template.reorder",{from:i,to:i+1}); }});
+  host.querySelectorAll("[data-del]").forEach(b=> b.onclick=()=>{ const i=+b.dataset.del; if(!confirm(`Remove column ${template[i].key}?`)) return; const key=template[i].key; template.splice(i,1); saveTemplate(); buildTemplateEditor(); refreshAll(); logAudit("template.remove",{key}); });
+}
+function downloadBackup(){
+  const payload={rows,template,complaints,settings,rules,audit,profile, ts:new Date().toISOString()};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="article_status_backup.json"; a.click();
+}
+function restoreBackup(e){
+  const f=e.target.files[0]; if(!f) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const o=JSON.parse(reader.result);
+      if(o.rows) rows=o.rows; if(o.template) template=o.template; if(o.complaints) complaints=o.complaints;
+      if(o.settings) settings=Object.assign(settings,o.settings); if(o.rules) rules=o.rules; if(o.audit) audit=o.audit; if(o.profile) profile=o.profile;
+      persist(); saveTemplate(); saveComplaints(); saveRules(); saveAudit(); persistSettings(); persistProfile(); refreshAll();
+      logAudit("backup.restore",{});
+      alert("Backup restored.");
+    }catch(err){ alert("Invalid JSON."); }
+  };
+  reader.readAsText(f);
+}
+
+/* ======================= Init ======================= */
+function buildScopeSelectors(){ buildOptions(); }
+function refreshAll(){
+  buildScopeSelectors();
+  buildManualForm();
+  renderTable();
+  renderComplaints();
+  refreshKPIs();
+  refreshCharts();
+  renderAlerts();
+  buildRuleTable();
+  renderAudit();
+}
+function boot(){
+  loadTheme();
+  seedUsersIfEmpty();
+  // Session restore
+  const session = JSON.parse(localStorage.getItem(LS.SESSION)||"null");
+  if(session){
+    const p = JSON.parse(localStorage.getItem(LS.PROFILE)||"{}");
+    profile = Object.assign({username:session.user, role:"Operator", region:"", division:""}, p);
+    $("chipUser").textContent = profile.username; $("chipRole").textContent = profile.role;
+    showAppUI(true);
+  } else {
+    showAppUI(false);
+  }
+  loadAll();
+  if(!rules.length){ rules=[{scope:"GLOBAL",key:"GLOBAL",hours:72}]; saveRules(); }
+  buildTabs();
+  buildTemplateEditor();
+  applyRole();
+  refreshAll();
+}
+boot();
+</script>
+</body>
+</html>
