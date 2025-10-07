@@ -554,58 +554,44 @@ function handleFile(){
       const data = new Uint8Array(e.target.result);
       const wb = XLSX.read(data, { type: "array", cellDates: true, raw: false });
 
-      let parsed = null, diag = [];
-
-      for (const sheetName of wb.SheetNames){
-        const ws = wb.Sheets[sheetName];
-        if (!ws || !ws['!ref']) { diag.push(`Sheet "${sheetName}": empty !ref`); continue; }
-
-        // Strategy A: AOA parsing, header detection
-        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false, raw: false });
-        if (!aoa || aoa.length === 0) { diag.push(`Sheet "${sheetName}": empty AOA`); }
-        else {
-          const headerRow = _detectHeaderRow(aoa);
-          if (headerRow >= 0){
-            const arr = _rowsFromAOA(aoa, headerRow);
-            parsed = { arr, sheet: sheetName, headerRow };
-            break;
-          } else {
-            diag.push(`Sheet "${sheetName}": no header row (scanned ${aoa.length} rows)`);
-          }
-        }
-
-        // Strategy B: CSV fallback then rebuild AOA
-        if (!parsed){
-          const csv = XLSX.utils.sheet_to_csv(ws);
-          const rows = csv.split(/\r?\n/).map(line => line.split(","));
-          const headerRow = _detectHeaderRow(rows);
-          if (headerRow >= 0){
-            const arrCSV = _rowsFromAOA(rows, headerRow);
-            parsed = { arr: arrCSV, sheet: sheetName, headerRow, via: "csv" };
-            break;
-          } else {
-            diag.push(`Sheet "${sheetName}": CSV fallback also failed`);
-          }
-        }
+      // pick the first sheet with data
+      let ws = null, chosenSheet = null;
+      for(const name of wb.SheetNames){
+        const w = wb.Sheets[name];
+        if (w && w['!ref']) { ws = w; chosenSheet = name; break; }
       }
+      if(!ws){ throw new Error("Workbook has no populated sheets."); }
 
-      if(!parsed) {
-        console.error("Parse diagnostics:", diag);
-        alert("File parse error. No valid header row found.\n\nDiagnostics:\n- " + diag.join("\n- "));
-        return;
+      // AOA so we can pick the first non-empty row as header
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false, raw: false });
+      if(!aoa || !aoa.length) throw new Error(`Sheet "${chosenSheet}" is empty.`);
+
+      // find the first non-empty row (>=3 non-empty cells) and treat as header
+      let headerRow = -1;
+      for(let i=0;i<aoa.length;i++){
+        const nonEmpty = aoa[i].filter(v => String(v).trim() !== "");
+        if(nonEmpty.length >= 3){ headerRow = i; break; }
       }
+      if(headerRow === -1) throw new Error(`No plausible header row found in "${chosenSheet}".`);
 
-      importRows(parsed.arr); // let importRows do header normalization/mapping
+      const headers = aoa[headerRow].map(h => String(h||"").trim());
+      const rowsAOA = aoa.slice(headerRow+1).filter(r => r.some(v => String(v).trim() !== ""));
+
+      const arr = rowsAOA.map(r => {
+        const o = {};
+        headers.forEach((h,idx)=> o[h] = r[idx] ?? "");
+        return o;
+      });
+
+      console.log("Import diagnostics:", {sheet: chosenSheet, headerRow, headerSample: headers.slice(0,10)});
+      importRows(arr); // mapping + saving happens inside
     }catch(err){
-      console.error(err);
-      alert("File parse error. Ensure the first row with headers is present and try again.");
+      console.error("Import error:", err);
+      alert(`File parse error: ${err.message || err}`);
     }
   };
   reader.readAsArrayBuffer(f);
 }
-
-
-
 
 function importRows(arr){
   const batchId = document.getElementById("batchName").value.trim() || ("Batch_"+new Date().toISOString().slice(0,10));
@@ -616,9 +602,16 @@ function importRows(arr){
   if(mode==="replace") rows = [];
 
 
-const enabled = template.filter(c=>c.enabled).map(c=>c.key);
+  const enabled = template.filter(c=>c.enabled).map(c=>c.key);
 
-  // alias map for common variations
+  // normalizer: "booking_date time" -> "booking-date-time"
+  const norm = s => String(s||"")
+    .trim().toLowerCase()
+    .replace(/[._/]+/g,"-")
+    .replace(/\s+/g,"-")
+    .replace(/[^a-z0-9-]/g,"")
+    .replace(/-+/g,"-");
+
   const aliases = {
     "bookingdatetime":"booking-date-time",
     "booking-date":"booking-date-time",
@@ -640,22 +633,19 @@ const enabled = template.filter(c=>c.enabled).map(c=>c.key);
     "vpcodvalue":"vp-cod-value"
   };
 
-  const normTemplate = enabled.map(k => ({ key: k, n: _normKey(k) }));
+  const normTemplate = enabled.map(k => ({key:k, n:norm(k)}));
 
-  // Build a header map from the first row's keys of arr
+  // Build header map from the keys of the first data object
   const sample = arr[0] || {};
   const headerMap = {};
-  Object.keys(sample).forEach(sc => {
-    const ns = _normKey(sc);
-    // 1) alias → canonical
-    const alias = aliases[ns];
-    if (alias && enabled.includes(alias)) { headerMap[sc] = alias; return; }
-    // 2) exact normalized match
+  Object.keys(sample).forEach(sc=>{
+    const ns = norm(sc);
+    const aliasKey = aliases[ns];
+    if (aliasKey && enabled.includes(aliasKey)) { headerMap[sc] = aliasKey; return; }
     const exact = normTemplate.find(t => t.n === ns);
     if (exact) { headerMap[sc] = exact.key; return; }
-    // 3) soft startsWith match
     const soft = normTemplate.find(t => t.n.startsWith(ns) || ns.startsWith(t.n));
-    headerMap[sc] = soft ? soft.key : sc; // fallback to original
+    headerMap[sc] = soft ? soft.key : sc;
   });
 
   
