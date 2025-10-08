@@ -886,7 +886,7 @@ function renderTable(){
     const status = String(r["DELIVERY STATUS"]||"").toUpperCase();
     const cls = status==="DELIVERED"?"delivered":status==="IN-TRANSIT"?"intransit":status==="EXCEPTION"?"exception":"pending";
     let html = `<td><input type="checkbox" data-id="${idx}"></td>`;
-    html += `<td><a href="javascript:void(0)" onclick='showDetails(${idx})'>Details</a></td>`;
+    html += `<td><a href="javascript:void(0)" onclick='showDetails(${idx})'>ℹ️</a></td>`;
     cols.forEach(c=>{
       let v = r[c] ?? "";
       if(c==="DELIVERY STATUS") v = `<span class="pill ${cls}">${status||"—"}</span>`;
