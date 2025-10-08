@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>MMU-Monitoring Dashboard</title>
 
-<!-- ===== IMPORTANT: Self-hosted Excel parser (place xlsx.full.min.js next to this file) ===== -->
+<!-- Self-hosted Excel parser (place xlsx.full.min.js next to this file) -->
 <script src="./xlsx.full.min.js"></script>
 
 <!-- PDF export -->
@@ -17,58 +17,56 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.13/dayjs.min.js"></script>
 
 <style>
-/* ------------------- Theme system: default is LIGHT ------------------- */
+/* ------------------- Glassmorphic Light Theme ------------------- */
 :root{
-  /* Light (default) */
-  --bg:#f7f8fb;
-  --panel:#ffffff;
-  --panel2:#fafafa;
-  --brand:#a11b23;            /* burgundy accent retained for brand */
-  --ink:#0f172a;               /* slate-900 */
-  --muted:#6b7280;
-  --accent:#c69125;            /* refined gold */
-  --accent-strong:#b07a0a;
-  --danger:#dc2626;
-  --ok:#16a34a;
-  --info:#2563eb;
-  --border: rgba(0,0,0,.12);
-  --shadow: 0 10px 26px rgba(0,0,0,.08);
+  --bg: #f3f5fb;               /* soft neutral */
+  --glass: rgba(255,255,255,0.6);
+  --glass-strong: rgba(255,255,255,0.75);
+  --glass-hover: rgba(255,255,255,0.9);
+  --blur: 14px;
+
+  --ink: #0f172a;              /* slate-900 */
+  --muted:#6b7280;             /* slate-500 */
+  --border: rgba(15,23,42,.12);
+  --shadow: 0 12px 40px rgba(2,6,23,.08);
+
+  /* Brand & semantic color code */
+  --brand:#9b1c24;             /* deep burgundy */
+  --gold:#c89d2a;              /* accent gold */
+  --ok:#16a34a;                /* green */
+  --warn:#d97706;              /* amber */
+  --info:#2563eb;              /* blue */
+  --danger:#dc2626;            /* red */
+
+  /* Status tones (pills/tags) */
+  --st-delivered-bg:#ecfdf5; --st-delivered-fg:#166534; --st-delivered-bd:#86efac;
+  --st-intransit-bg:#eff6ff; --st-intransit-fg:#1e3a8a; --st-intransit-bd:#bfdbfe;
+  --st-pending-bg:#fffbeb;   --st-pending-fg:#7c2d12;  --st-pending-bd:#fde68a;
+  --st-exception-bg:#fef2f2; --st-exception-fg:#7f1d1d;--st-exception-bd:#fecaca;
+
   --radius:16px;
 }
-body.theme-dark{
-  --bg: #0f0f12;
-  --panel:#1a1b20;
-  --panel2:#16171b;
-  --brand:#7b1b22;
-  --ink: #f1f5f9;
-  --muted:#cbd5e1;
-  --accent:#f4c969;
-  --accent-strong:#f2b537;
-  --danger:#ef4444;
-  --ok:#34d399;
-  --info:#60a5fa;
-  --border: rgba(255,255,255,.14);
-  --shadow: 0 18px 46px rgba(0,0,0,.35);
-}
 
-*{box-sizing:border-box}
+/* Page background with subtle gradient + texture */
 html,body{height:100%}
 body{
   margin:0;
-  background: var(--bg);               /* clean light background (no heavy gradients) */
   color:var(--ink);
-  font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif
+  font-family:system-ui, Segoe UI, Roboto, Arial, sans-serif;
+  background:
+    radial-gradient(1200px 700px at 20% -10%, #ffffff 0%, #eef2ff 45%, #e9f0ff00 60%),
+    radial-gradient(1000px 800px at 110% 10%, #fff 0%, #f3f5fb 40%, #f3f5fb 100%);
 }
-a{color:inherit;text-decoration:none}
-button{cursor:pointer}
 
-/* Layout helpers */
-.wrap{max-width:1280px;margin:0 auto;padding:12px}
+/* Generic containers */
+.wrap{max-width:1280px;margin:0 auto;padding:14px}
 .card{
-  background: linear-gradient(180deg,var(--panel),var(--panel2));
-  border:1px solid var(--border);
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding:14px;
+  padding: 14px;
   box-shadow: var(--shadow);
 }
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -79,7 +77,9 @@ button{cursor:pointer}
 
 /* Inputs / Buttons */
 input,select,textarea,button{
-  background: #ffffff;
+  background: var(--glass-strong);
+  backdrop-filter: blur(calc(var(--blur) - 4px));
+  -webkit-backdrop-filter: blur(calc(var(--blur) - 4px));
   color: var(--ink);
   border:1px solid var(--border);
   border-radius:12px;
@@ -87,61 +87,78 @@ input,select,textarea,button{
 }
 input::placeholder{color:var(--muted)}
 button.btn{
-  background:linear-gradient(180deg, #fff7e0, #ffe9b8);
-  border-color:#d7b15c;
-  color:#1f2937;
+  background: linear-gradient(180deg, rgba(200,157,42,.18), rgba(200,157,42,.10));
+  border-color: rgba(200,157,42,.45);
+  color:#111827;
   font-weight:700;
 }
-.btn.ghost{background:#ffffff;border-color:var(--border)}
-.btn.red{background:linear-gradient(180deg,#fee2e2,#fecaca);border-color:#fca5a5}
-.btn.gray{background:#f3f4f6}
+.btn.ghost{background:var(--glass-strong);border-color:var(--border)}
+.btn.red{background:linear-gradient(180deg,rgba(220,38,38,.12),rgba(220,38,38,.06));border-color:rgba(220,38,38,.35)}
+.btn.gray{background:var(--glass-strong)}
+.badge{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);color:#111827;background:var(--glass-strong)}
 
-/* Header (clean, professional, light) */
+/* Header: glass bar */
 .header{
   position:sticky;top:0;z-index:50;
   border-bottom:1px solid var(--border);
-  background:#ffffffcc;
-  backdrop-filter: blur(8px);
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
 }
 .header-inner{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
 .brand{display:flex;gap:10px;align-items:center;font-weight:900;font-size:18px;color:#111827}
 .head-actions{justify-self:end;display:flex;gap:8px;align-items:center}
 .head-center{justify-self:center;display:flex;gap:8px;align-items:center}
 
-/* Tabs row (alerts will live here, aligned right) */
+/* Tabs BAR (now separate section BELOW header) */
+.tabs-shell{ /* this sits BELOW the header for proper spacing */
+  background: transparent;
+}
 .tabs-bar{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:8px 0 4px 0;
-  border-bottom:1px solid var(--border);
-  margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;
+  padding:10px 0 6px 0;
+  margin-bottom:12px;
 }
 .tabs{display:flex;gap:8px;flex-wrap:wrap}
 .tab{
   padding:8px 12px;border-radius:999px;border:1px solid var(--border);
-  background:#ffffff;font-weight:700;color:#111827
+  background: var(--glass-strong);
+  font-weight:700;color:#111827
 }
-.tab.active{border-color:#d7b15c;box-shadow:inset 0 0 0 2px #f4e3b4}
-#alertsSlot{margin-left:auto} /* right aligned container for Alerts */
+.tab.active{
+  border-color: rgba(200,157,42,.6);
+  box-shadow: inset 0 0 0 2px rgba(200,157,42,.25);
+}
+#alertsSlot{margin-left:auto;position:relative}
+#alertMenu{
+  position:absolute; right:0; top:36px; min-width:320px;
+}
 
-/* Tables: full borders + inline filters row */
-.table-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
-table{border-collapse:separate;border-spacing:0;width:100%;min-width:900px}
+/* Tables: full borders + inline filters row (glass) */
+.table-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(calc(var(--blur) - 4px))}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:900px;background:transparent}
 th,td{
   padding:10px 12px;
   border-right:1px solid var(--border);
   border-bottom:1px solid var(--border);
-  background:#fff;
+  background: transparent;
 }
-th{position:sticky;top:0;background:#f8fafc;font-size:12px;text-transform:uppercase;letter-spacing:.35px;color:#374151;z-index:1}
-tr:last-child td{border-bottom: none;}
-/* left border for first column, top border for headers */
+th{
+  position:sticky;top:0;
+  background: var(--glass-hover);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  font-size:12px;text-transform:uppercase;letter-spacing:.35px;color:#374151;z-index:1
+}
+tr:last-child td{border-bottom:none}
 table tr th:first-child, table tr td:first-child{border-left:1px solid var(--border)}
 table thead tr:first-child th{border-top:1px solid var(--border)}
-/* Inline filter inputs row (sits below header) */
+
+/* Inline filter row (sticks below the header row) */
 tr.filter-row th, tr.filter-row td{
-  background:#ffffff;
+  background: var(--glass-strong);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
   position:sticky;
   top:38px;           /* directly under headers */
   z-index:1;
@@ -151,25 +168,27 @@ tr.filter-row th, tr.filter-row td{
   padding:6px 8px;
   border:1px solid var(--border);
   border-radius:8px;
-  background:#ffffff;
+  background: var(--glass-hover);
   font-size:12px;
 }
 
-/* Status pills (light palette) */
-.pill{padding:3px 8px;border-radius:999px;border:1px solid var(--border);font-size:12px;background:#fff}
-.pill.delivered{border-color:#86efac;color:#166534;background:#ecfdf5}
-.pill.intransit{border-color:#bfdbfe;color:#1e3a8a;background:#eff6ff}
-.pill.pending{border-color:#fde68a;color:#7c2d12;background:#fffbeb}
-.pill.exception{border-color:#fecaca;color:#7f1d1d;background:#fef2f2}
+/* Status pills with semantic color code */
+.pill{padding:3px 8px;border-radius:999px;border:1px solid var(--border);font-size:12px;background:var(--glass-strong)}
+.pill.delivered{border-color:var(--st-delivered-bd);color:var(--st-delivered-fg);background:var(--st-delivered-bg)}
+.pill.intransit{border-color:var(--st-intransit-bd);color:var(--st-intransit-fg);background:var(--st-intransit-bg)}
+.pill.pending{border-color:var(--st-pending-bd);color:var(--st-pending-fg);background:var(--st-pending-bg)}
+.pill.exception{border-color:var(--st-exception-bd);color:var(--st-exception-fg);background:var(--st-exception-bg)}
 
-/* KPIs (on clean white cards) */
+/* KPI cards */
 .kpi{font-size:28px;font-weight:900;color:#111827}
 
-/* Login (kept consistent, but light accents) */
+/* Login (glass) */
 .login-host{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .login-card{
   width:min(640px,96vw);
-  background:#ffffff;
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
   border:1px solid var(--border);
   border-radius:24px;
   padding:26px;
@@ -178,19 +197,16 @@ tr.filter-row th, tr.filter-row td{
 .login-card .title{font-size:40px;font-weight:900;text-align:center;color:#111827;margin:4px 0 20px}
 .field{margin:12px 0}
 .field label{display:block;margin:0 0 8px 0;color:#374151;font-weight:700}
-.input-wrap{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px}
+.input-wrap{display:flex;align-items:center;gap:8px;background:var(--glass-strong);border:1px solid var(--border);border-radius:12px;padding:10px}
 .input-wrap input{background:transparent;border:none;outline:none;color:#111827;width:100%}
 .input-wrap .icon{opacity:.7}
 .login-actions{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:center;margin-top:14px}
 .login-actions .sub{color:#6b7280;text-align:left}
 .err{color:#b91c1c;font-weight:700;margin-top:8px}
-
-/* Minimal left/right padding */
-.wrap{padding-left:10px;padding-right:10px}
 </style>
 </head>
-<body class="theme-light">
-<!-- =================== LOGIN (light, clean) =================== -->
+<body>
+<!-- =================== LOGIN =================== -->
 <div id="loginScreen" class="login-host">
   <div class="login-card">
     <div class="title">Welcome</div>
@@ -224,31 +240,33 @@ tr.filter-row th, tr.filter-row td{
   </div>
 </div>
 
-<!-- =================== HEADER (clean, light) =================== -->
+<!-- =================== HEADER (glass) =================== -->
 <div id="appHeader" class="header hidden">
   <div class="wrap header-inner">
     <div class="brand">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="#c69125" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="#c89d2a" aria-hidden="true">
         <path d="M12 2l4 4-4 4-4-4 4-4zm0 6l4 4-4 4-4-4 4-4zm0 6l4 4-4 4-4-4 4-4z"/>
       </svg>
       <div>MMU-Monitoring Dashboard</div>
     </div>
 
-    <div class="head-center"><!-- (kept empty by design for clean layout) --></div>
+    <div class="head-center"><!-- intentionally empty for clean layout --></div>
 
     <div class="head-actions">
-      <button id="themeBtn" class="btn ghost" onclick="toggleTheme()">Light</button>
-      <span id="chipUser" class="tab">—</span>
+      <span id="chipUser" class="badge">—</span>
       <button class="btn red" onclick="doLogout()">Logout</button>
     </div>
   </div>
+</div>
 
-  <!-- Tabs bar with Alerts aligned to the right -->
+<!-- =================== TABS ROW (separate section below header) =================== -->
+<div id="tabsShell" class="tabs-shell hidden">
   <div class="wrap tabs-bar">
     <div class="tabs" id="tabs"></div>
+    <!-- Alerts at the far right (NOT in header) -->
     <div id="alertsSlot">
-      <button id="alertBtn" class="btn">Alerts <span id="alertCount" class="tab hidden">0</span></button>
-      <div id="alertMenu" class="card hidden" style="position:absolute; right:14px; margin-top:6px; min-width:320px;"></div>
+      <button id="alertBtn" class="btn">Alerts <span id="alertCount" class="badge hidden">0</span></button>
+      <div id="alertMenu" class="card hidden"></div>
     </div>
   </div>
 </div>
@@ -274,9 +292,9 @@ tr.filter-row th, tr.filter-row td{
           </select>
           <button type="button" class="btn" onclick="window.handleFile()">Import</button>
         </div>
-        <div class="tab" style="margin-top:6px">
+        <div class="badge" style="margin-top:6px">
           Tip: header row can use hyphens or underscores; the importer maps to the template automatically.
-          If Excel CDNs are blocked, use the self-hosted file (already set) or Save As → CSV and import.
+          If network blocks external scripts, Excel is parsed via the self-hosted file or use CSV.
         </div>
       </div>
 
@@ -307,21 +325,21 @@ tr.filter-row th, tr.filter-row td{
             <input type="file" accept=".json" onchange="restoreBackup(event)"/>
           </label>
         </div>
-        <div class="tab" style="margin-top:6px">
+        <div class="badge" style="margin-top:6px">
           Backup includes rows, template, complaints, rules, audit, settings, and profile. Restore overwrites in-browser data.
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ===== Dashboard (clean, no shaded backgrounds) ===== -->
+  <!-- ===== Dashboard ===== -->
   <section class="card" data-tab="Dashboard">
     <h3>Analytics</h3>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
-      <div class="card"><div class="tab">Total (in scope)</div><div class="kpi" id="kpiTotal">0</div></div>
-      <div class="card"><div class="tab">Delivered</div><div class="kpi" id="kpiDelivered">0</div></div>
-      <div class="card"><div class="tab">Pending (&gt; SLA)</div><div class="kpi" id="kpiAged">0</div></div>
-      <div class="card"><div class="tab">Exceptions</div><div class="kpi" id="kpiException">0</div></div>
+      <div class="card"><div class="badge">Total (in scope)</div><div class="kpi" id="kpiTotal">0</div></div>
+      <div class="card"><div class="badge">Delivered</div><div class="kpi" id="kpiDelivered">0</div></div>
+      <div class="card"><div class="badge">Pending (&gt; SLA)</div><div class="kpi" id="kpiAged">0</div></div>
+      <div class="card"><div class="badge">Exceptions</div><div class="kpi" id="kpiException">0</div></div>
     </div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
       <div class="card"><canvas id="chartStatus"></canvas></div>
@@ -372,9 +390,11 @@ tr.filter-row th, tr.filter-row td{
     <div class="table-wrap" style="margin-top:8px"><table id="reportTable"></table></div>
   </section>
 
-  <!-- ===== Complaints (dropdown Issue type + custom) ===== -->
+  <!-- ===== Complaints (dropdown Issue type + custom + date + bulk entry) ===== -->
   <section class="card" data-tab="Complaints">
     <h3>Complaints & Issues</h3>
+
+    <!-- Single add/update row -->
     <div class="row">
       <input id="cmpArticle" placeholder="article-number"/>
       <label class="row">Issue type:
@@ -394,6 +414,7 @@ tr.filter-row th, tr.filter-row td{
         </select>
       </label>
       <input id="cmpTypeCustom" class="hidden" placeholder="Enter custom issue type"/>
+      <input id="cmpDate" type="date" title="Date of event/update"/>
       <input id="cmpDesc" class="grow" placeholder="Latest update / note (timeline event)"/>
       <select id="cmpStatus">
         <option value="Open">Open</option>
@@ -406,14 +427,57 @@ tr.filter-row th, tr.filter-row td{
       <button class="btn" onclick="addComplaint()">Add / Update</button>
     </div>
 
+    <!-- Bulk entry for multiple articles with the same issue -->
+    <div class="card">
+      <h4>Bulk Articles – Same Issue</h4>
+      <div class="row">
+        <textarea id="cmpBulkArticles" class="grow" rows="3" placeholder="Paste article numbers here (comma or new line separated)"></textarea>
+      </div>
+      <div class="row">
+        <label class="row">Issue type:
+          <select id="cmpBulkType" onchange="toggleCustomIssueBulk()">
+            <option value="">— choose —</option>
+            <option>COD</option>
+            <option>COD Payment Issue</option>
+            <option>Damage</option>
+            <option>Delivery Details updation pending</option>
+            <option>In-Transit</option>
+            <option>Non-Delivery</option>
+            <option>POD</option>
+            <option>Pickup pending</option>
+            <option>Picked-booking pending</option>
+            <option>RTS</option>
+            <option>Other/Custom</option>
+          </select>
+        </label>
+        <input id="cmpBulkTypeCustom" class="hidden" placeholder="Enter custom issue type"/>
+        <input id="cmpBulkDate" type="date" title="Date of event/update"/>
+        <input id="cmpBulkDesc" class="grow" placeholder="Latest update / note"/>
+        <label class="row">Bulk status:
+          <select id="cmpBulkStatus">
+            <option value="">— choose —</option>
+            <option>Open</option><option>In-Progress</option><option>Escalated</option>
+            <option>Resolved</option><option>Closed</option><option>Re-opened</option>
+            <option>Other/Custom</option>
+          </select>
+        </label>
+        <input id="cmpBulkStatusCustom" class="hidden" placeholder="Enter custom status"/>
+        <button class="btn" onclick="addComplaintBulk()">Apply to Articles</button>
+        <button class="btn gray" onclick="clearComplaintBulk()">Clear / Reset</button>
+      </div>
+    </div>
+
+    <!-- Bulk status change for selected complaint rows -->
     <div class="row" style="margin-top:6px">
-      <label class="row">Bulk status:
-        <select id="cmpBulkStatus">
+      <label class="row">Bulk status (selected rows):
+        <select id="cmpRowBulkStatus" onchange="toggleRowBulkCustom()">
           <option value="">— choose —</option>
           <option>Open</option><option>In-Progress</option><option>Escalated</option>
           <option>Resolved</option><option>Closed</option><option>Re-opened</option>
+          <option>Other/Custom</option>
         </select>
       </label>
+      <input id="cmpRowBulkStatusCustom" class="hidden" placeholder="Enter custom status"/>
       <button class="btn" onclick="applyComplaintBulk()">Apply to selected</button>
       <button class="btn gray" onclick="exportComplaints()">Export</button>
     </div>
@@ -437,7 +501,7 @@ tr.filter-row th, tr.filter-row td{
     <div class="table-wrap" style="margin-top:8px"><table id="ruleTable"></table></div>
   </section>
 
-  <!-- ===== Audit (Superadmin only — hidden by RBAC for others) ===== -->
+  <!-- ===== Audit (Superadmin only — RBAC) ===== -->
   <section class="card" data-tab="Audit">
     <h3>Audit Log</h3>
     <div class="table-wrap"><table id="auditTable"></table></div>
@@ -501,14 +565,13 @@ const ROLE = { Viewer:0, Operator:1, Supervisor:2, Admin:3, Superadmin:4 };
 const LS = {
   ROWS:"as_rows_v3",
   TEMPLATE:"as_template_v3",
-  COMPLAINTS:"as_complaints_v4",    // bumped for timeline model
+  COMPLAINTS:"as_complaints_v4",
   SETTINGS:"as_settings_v3",
   RULES:"as_rules_v2",
   AUDIT:"as_audit_v2",
   PROFILE:"as_profile_v2",
   USERS:"as_users_v2",
-  SESSION:"as_session_v2",
-  THEME:"as_theme_v3"
+  SESSION:"as_session_v2"
 };
 
 /* State */
@@ -517,18 +580,8 @@ let profile={username:"", role:"Operator", region:"", division:""};
 let settings={ defaultPeriod:"monthly", allowDelete:"role" };
 let charts={}, alertTimer=null;
 
-/* =================== Theme (default light) =================== */
-function loadTheme(){
-  const t = localStorage.getItem(LS.THEME) || "light";
-  document.body.classList.toggle("theme-dark", t==="dark");
-  $("themeBtn").textContent = (t==="dark" ? "Dark" : "Light");
-}
-function toggleTheme(){
-  const cur = localStorage.getItem(LS.THEME) || "light";
-  const next = (cur==="light" ? "dark" : "light");
-  localStorage.setItem(LS.THEME, next);
-  loadTheme();
-}
+/* =================== Theme (fixed light — no toggle) =================== */
+function loadTheme(){ /* kept for future; currently always light */ }
 
 /* =================== Auth =================== */
 function enc(s){return new TextEncoder().encode(s)}
@@ -550,6 +603,7 @@ function seedUsersIfEmpty(){
 function showApp(show){
   $("loginScreen").classList.toggle("hidden", show);
   $("appHeader").classList.toggle("hidden", !show);
+  $("tabsShell").classList.toggle("hidden", !show);   // tabs row sits BELOW header
   $("appMain").classList.toggle("hidden", !show);
 }
 function togglePw(){ const i=$("lgPass"); i.type = (i.type==="password"?"text":"password"); }
@@ -577,13 +631,10 @@ function loadAll(){
   rows=JSON.parse(localStorage.getItem(LS.ROWS)||"[]");
   template=JSON.parse(localStorage.getItem(LS.TEMPLATE)||"null") || DEFAULT_COLUMNS.map(k=>({key:k,label:k,enabled:true}));
   complaints=JSON.parse(localStorage.getItem(LS.COMPLAINTS)||"[]");
-  // migrate old complaints (flat) to timeline model if needed
   if(complaints.length && !complaints[0].timeline){
     complaints = complaints.map(c=>({
-      article:c.article,
-      type:c.type,
-      status:c.status||"Open",
-      timeline: [{ts:c.ts||new Date().toISOString(), note:c.desc||""}]
+      article:c.article, type:c.type, status:c.status||"Open",
+      timeline:[{ts:c.ts||new Date().toISOString(), note:c.desc||""}]
     }));
     localStorage.setItem(LS.COMPLAINTS, JSON.stringify(complaints));
   }
@@ -613,7 +664,6 @@ function persistProfile(){
 function roleLevel(){ return ROLE[profile.role] ?? ROLE.Operator; }
 function can(action){
   const lvl = roleLevel();
-  // Audit visible only to Superadmin (4). Settings to Admin+ (3).
   const matrix = {
     import:1, manualAdd:1, bulkUpdate:1,
     delete: (settings.allowDelete==="always")?0:(settings.allowDelete==="never"?99:3),
@@ -626,7 +676,7 @@ function applyRole(){
   $("chipUser").textContent = profile.username || "—";
   toggleTab("Audit", can("seeAudit"));
   toggleTab("Settings", can("seeSettings"));
-  $("btnDelete").classList.toggle("hidden", !can("delete"));
+  const delBtn=$("btnDelete"); if(delBtn) delBtn.classList.toggle("hidden", !can("delete"));
   buildTemplateEditor();
 }
 function toggleTab(name, show){
@@ -651,52 +701,62 @@ function buildTabs(){
   activateTab("Dashboard", host.children[0]);
 }
 function activateTab(name, btn){
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  btn.classList.add("active");
+  document.querySelectorAll("#tabs .tab").forEach(t=>t.classList.remove("active"));
+  if(btn) btn.classList.add("active");
   document.querySelectorAll("[data-tab]").forEach(sec=>{
     sec.style.display = (sec.getAttribute("data-tab")===name) ? "block" : "none";
   });
 }
 
-/* =================== Inline filters (generic) =================== */
-/* Adds a filter-row under headers; hides table rows that don't match. */
+/* =================== INLINE FILTERS — FIXED =================== */
+/* Build a filter row with inputs carrying data-col=<absolute column index>.
+   Filtering reads each input's data-col so action/checkbox columns don't shift indices. */
 function addInlineFilters(tableEl){
   const thead = tableEl.querySelector("thead");
+  if(!thead) return;
+  // Remove existing filter row if rebuilding
+  const prev = thead.querySelector("tr.filter-row"); if(prev) prev.remove();
+
   const headerCells = [...thead.querySelectorAll("tr:first-child th")];
-  // Build filter row
-  const filterTr = document.createElement("tr");
-  filterTr.className = "filter-row";
+  const filterTr = document.createElement("tr"); filterTr.className="filter-row";
+
   headerCells.forEach((th, idx)=>{
     const fth = document.createElement("th");
-    // For checkbox or action columns, leave empty filter
     const headerText = th.textContent.trim().toLowerCase();
-    const isCheckbox = (idx===0 && (headerText.includes("select") || th.querySelector('input[type="checkbox"]')));
-    const isAction = headerText==="details" || headerText==="#";
-    if(isCheckbox || isAction){ fth.innerHTML=""; }
-    else{
+    const isCheckbox = th.querySelector('input[type="checkbox"]') || headerText==="#" || headerText==="details";
+    if(isCheckbox){
+      // Keep a placeholder (no input) to preserve correct column count
+      fth.innerHTML = ""; // no input
+    }else{
       fth.innerHTML = `<input class="inline-filter" data-col="${idx}" placeholder="Filter…">`;
     }
     filterTr.appendChild(fth);
   });
   thead.appendChild(filterTr);
 
-  // Attach filter logic
+  // Hook inputs
   thead.querySelectorAll(".inline-filter").forEach(inp=>{
     inp.addEventListener("input", ()=>applyTableFilters(tableEl));
   });
 }
 function applyTableFilters(tableEl){
   const thead = tableEl.querySelector("thead");
-  const filters = [...thead.querySelectorAll(".inline-filter")].map(i=> (i? i.value.trim().toLowerCase(): ""));
-  const rows = tableEl.querySelectorAll("tbody tr");
-  rows.forEach(tr=>{
+  const inputs = [...thead.querySelectorAll(".inline-filter")];
+  const tbody = tableEl.querySelector("tbody");
+  if(!tbody) return;
+  const rowsTR = [...tbody.querySelectorAll("tr")];
+
+  rowsTR.forEach(tr=>{
     const tds=[...tr.children];
-    const ok = filters.every((f, colIdx)=>{
-      if(!f) return true;
-      const td = tds[colIdx]; if(!td) return true;
-      const txt = td.textContent.toLowerCase();
-      return txt.includes(f);
-    });
+    let ok=true;
+    for(const inp of inputs){
+      const f = inp.value.trim().toLowerCase();
+      if(!f) continue;
+      const colIdx = +inp.dataset.col;
+      const td = tds[colIdx];
+      const txt = (td?.textContent || "").toLowerCase();
+      if(!txt.includes(f)){ ok=false; break; }
+    }
     tr.style.display = ok ? "" : "none";
   });
 }
@@ -718,9 +778,9 @@ function computeAlerts(){
     return dayjs().diff(d,"hour") > slaHoursFor(r);
   });
   return [
-    {label:`Missing required fields: ${missing.length}`, action:()=>{ activateTab("Reports", document.querySelectorAll("#tabs .tab")[3]); $("reportType").value="exceptions"; buildReport(); }},
-    {label:`Duplicate article-number: ${dupKeys.size}`, action:()=>{ activateTab("Reports", document.querySelectorAll("#tabs .tab")[3]); $("reportType").value="exceptions"; buildReport(); }},
-    {label:`Aged pending (> SLA): ${aged.length}`, action:()=>{ activateTab("Bulk View & Update", document.querySelectorAll("#tabs .tab")[2]); $("fStatus").value="PENDING"; renderTable(); }}
+    {label:`Missing required fields: ${missing.length}`, action:()=>{ activateTab("Reports", document.querySelector('#tabs .tab:nth-child(4)')); $("reportType").value="exceptions"; buildReport(); }},
+    {label:`Duplicate article-number: ${dupKeys.size}`, action:()=>{ activateTab("Reports", document.querySelector('#tabs .tab:nth-child(4)')); $("reportType").value="exceptions"; buildReport(); }},
+    {label:`Aged pending (> SLA): ${aged.length}`, action:()=>{ activateTab("Bulk View & Update", document.querySelector('#tabs .tab:nth-child(3)')); }}
   ];
 }
 function renderAlertsHeader(){
@@ -732,16 +792,13 @@ function renderAlertsHeader(){
   const total=items.reduce((a,i)=> a + (parseInt(i.label.match(/(\d+)/)?.[1]||0)), 0);
   const c=$("alertCount");
   if(total>0){ c.textContent=total; c.classList.remove("hidden"); } else { c.classList.add("hidden"); }
-  // wire actions
   [...menu.querySelectorAll(".row")].forEach((el,idx)=> el.querySelector("button").onclick=()=>{ items[idx].action(); menu.classList.add("hidden"); });
 }
-$("alertBtn").onclick = ()=>{
-  $("alertMenu").classList.toggle("hidden");
-};
+$("alertBtn").onclick = ()=>{ $("alertMenu").classList.toggle("hidden"); };
 
 /* =================== Data Management: Template & Manual Entry =================== */
 function buildTemplateEditor(){
-  const host=$("templateEditor"); host.innerHTML="";
+  const host=$("templateEditor"); if(!host) return; host.innerHTML="";
   template.forEach((col,idx)=>{
     const card=document.createElement("div"); card.className="card";
     const disabled=!can("templateEdit");
@@ -766,7 +823,7 @@ function buildTemplateEditor(){
 }
 
 function buildManualForm(){
-  const host=$("manualForm"); host.innerHTML="";
+  const host=$("manualForm"); if(!host) return; host.innerHTML="";
   template.filter(c=>c.enabled).forEach(col=>{
     const el=document.createElement("label"); el.className="grow";
     const ph=col.label||col.key; const type=/date/i.test(col.key)?"datetime-local":"text";
@@ -801,34 +858,19 @@ function saveManual(e){
 function buildOptions(){
   const regs=[...new Set(rows.map(r=>r.Region).filter(Boolean))].sort();
   const divs=[...new Set(rows.map(r=>r.Division).filter(Boolean))].sort();
-  const batches=[...new Set(rows.map(r=>r._batchId).filter(Boolean))].sort();
   $("scopeRegion").innerHTML='<option value="">All</option>'+regs.map(x=>`<option ${x===profile.region?"selected":""}>${x}</option>`).join("");
   $("scopeDivision").innerHTML='<option value="">All</option>'+divs.map(x=>`<option ${x===profile.division?"selected":""}>${x}</option>`).join("");
 }
-
 function scopeFilter(r){
   if(profile.region && r.Region!==profile.region) return false;
   if(profile.division && r.Division!==profile.division) return false;
   return true;
 }
 
-function getBrowseFiltersFromInline(tableEl){
-  // read the inline filters from the filter-row for browse table
-  const inputs = tableEl.querySelectorAll("thead .inline-filter");
-  const map = {};
-  inputs.forEach((inp, idx)=>{
-    const key = tableEl.dataset.keys ? JSON.parse(tableEl.dataset.keys)[idx] : null;
-    if(!key) return;
-    map[key] = inp.value.trim().toLowerCase();
-  });
-  return map;
-}
-
 function renderTable(){
   const cols = template.filter(c=>c.enabled).map(c=>c.key);
   const tbl = $("dataTable");
   tbl.innerHTML = "";
-  tbl.dataset.keys = JSON.stringify(["#","Details", ...cols]); // for filter mapping
 
   // Header
   const thead = document.createElement("thead");
@@ -856,7 +898,7 @@ function renderTable(){
   });
   tbl.appendChild(tbody);
 
-  // Add inline filter row & hook
+  // Add inline filter row & hook (fixed)
   addInlineFilters(tbl);
 }
 
@@ -869,7 +911,6 @@ function showDetails(idx){
   const msg = keys.map(k=>`${k}: ${r[k]??""}`).join("\n");
   alert(`Record (Batch: ${r._batchId||"—"}):\n\n${msg}`);
 }
-
 function applyBulk(){
   if(!can("bulkUpdate")) return alert("Not allowed by role.");
   const status=$("bulkStatus").value;
@@ -881,7 +922,6 @@ function applyBulk(){
   logAudit("bulk.update",{count:ids.length,status,date:d});
   alert("Bulk update applied.");
 }
-
 function deleteSelected(){
   if(!can("delete")) return alert("Not allowed by role.");
   const ids=new Set([...document.querySelectorAll('#dataTable tbody input[type="checkbox"]:checked')].map(ch=>+ch.dataset.id));
@@ -905,25 +945,16 @@ function exportTable(fmt){
     const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Browse"); XLSX.writeFile(wb,"browse_export.xlsx");
   }
 }
-function exportPDF(){
-  const cols = template.filter(c=>c.enabled).map(c=>c.key);
-  const inScope = rows.filter(scopeFilter);
-  const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:"landscape"});
-  const body = inScope.map(r=> cols.map(c=> String(r[c]??"")));
-  doc.text("Browse Export",14,12);
-  doc.autoTable({head:[cols],body,startY:16,styles:{fontSize:8}});
-  doc.save("browse_export.pdf");
-}
 
 /* =================== Reports (with inline filters) =================== */
 function countBy(key, arr){ const map={}; (arr||rows).forEach(r=>{ const k=r[key]||"—"; map[k]=(map[k]||0)+1; }); return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0])); }
 function slaHoursFor(r){ const look=[["CUSTOMER",r["customer-id"]],["ARTICLE-TYPE",r["article-type"]],["DIVISION",r["Division"]],["REGION",r["Region"]],["GLOBAL","GLOBAL"]]; for(const [scope,key] of look){ const hit=rules.find(x=>x.scope===scope && String(x.key||"")===String(key||"")); if(hit) return +hit.hours; } return 72; }
 
 function buildReport(){
-  const type=$("reportType").value;
   const host=$("reportTable"); host.innerHTML="";
   const makeRow=arr=>"<tr>"+arr.map(x=>`<td>${x}</td>`).join("")+"</tr>";
   const inScope=rows.filter(scopeFilter);
+  const type=document.getElementById("reportType").value;
 
   if(type==="summary"){
     const total=inScope.length;
@@ -985,8 +1016,6 @@ function buildReport(){
     const body="<tbody>"+inScope.map(r=>"<tr>"+cols.map(c=>`<td>${r[c]??""}</td>`).join("")+"</tr>").join("")+"</tbody>";
     host.innerHTML=head+body;
   }
-
-  // Add inline filters to report table
   addInlineFilters($("reportTable"));
 }
 function reportExport(fmt){
@@ -1007,9 +1036,17 @@ function reportExport(fmt){
   }
 }
 
-/* =================== Complaints (dropdown + custom + timeline in same row) =================== */
+/* =================== Complaints =================== */
 function toggleCustomIssue(){
   const sel=$("cmpType"); const cust=$("cmpTypeCustom");
+  cust.classList.toggle("hidden", sel.value!=="Other/Custom");
+}
+function toggleCustomIssueBulk(){
+  const sel=$("cmpBulkType"); const cust=$("cmpBulkTypeCustom");
+  cust.classList.toggle("hidden", sel.value!=="Other/Custom");
+}
+function toggleRowBulkCustom(){
+  const sel=$("cmpRowBulkStatus"); const cust=$("cmpRowBulkStatusCustom");
   cust.classList.toggle("hidden", sel.value!=="Other/Custom");
 }
 function pillForStatus(s){
@@ -1019,7 +1056,6 @@ function pillForStatus(s){
 }
 function renderComplaints(){
   const tbl=$("cmpTable");
-  // headers: select, Article, Issue type, Status, Timeline
   tbl.innerHTML=`<thead><tr>
     <th><input type="checkbox" onclick="toggleAllCmp(this)"></th>
     <th>Article</th><th>Issue type</th><th>Status</th><th>Timeline</th>
@@ -1029,10 +1065,8 @@ function renderComplaints(){
     <td>${c.article}</td>
     <td>${c.type}</td>
     <td>${pillForStatus(c.status||"Open")}</td>
-    <td>${(c.timeline||[]).map(ev=>`<div>• ${ev.ts} — ${ev.note||""}</div>`).join("")}</td>
+    <td>${(c.timeline||[]).map(ev=>`<div>• ${(ev.date||ev.ts||"").toString()} — ${ev.note||""}</div>`).join("")}</td>
   </tr>`).join("") + `</tbody>`;
-
-  // Inline filters for complaints
   addInlineFilters(tbl);
 }
 function toggleAllCmp(master){
@@ -1044,42 +1078,78 @@ function addComplaint(){
   if(type==="Other/Custom") type=$("cmpTypeCustom").value.trim();
   const note=$("cmpDesc").value.trim();
   const status=$("cmpStatus").value;
+  const dateVal=$("cmpDate").value;
 
   if(!article) return alert("article-number is required.");
   if(!type) return alert("Issue type is required.");
 
-  // Duplicate validation by article + issue type?
-  // Requirement says: duplicate entry validation for same article(s).
-  // Implement: ensure one row per article; if exists, we append to timeline only.
   const idx = complaints.findIndex(c=>c.article===article);
-  const event = {ts:new Date().toLocaleString(), note};
+  const event = {date: dateVal || new Date().toLocaleDateString(), ts:new Date().toLocaleString(), note};
 
   if(idx>=0){
-    // Update existing row: type & status overwrite, timeline append
     complaints[idx].type = type;
     complaints[idx].status = status;
     complaints[idx].timeline = complaints[idx].timeline || [];
     complaints[idx].timeline.push(event);
   }else{
-    // New row
     complaints.push({article, type, status, timeline:[event]});
   }
-
   saveComplaints(); renderComplaints();
-  $("cmpArticle").value=""; $("cmpType").value=""; $("cmpTypeCustom").value=""; $("cmpDesc").value="";
+  $("cmpArticle").value=""; $("cmpType").value=""; $("cmpTypeCustom").value=""; $("cmpDate").value=""; $("cmpDesc").value="";
   $("cmpTypeCustom").classList.add("hidden");
   logAudit("complaint.upsert",{article,status});
 }
+
+/* Bulk apply same issue to multiple pasted articles */
+function parseBulkArticles(txt){
+  return txt.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);
+}
+function addComplaintBulk(){
+  const list=parseBulkArticles($("cmpBulkArticles").value||"");
+  if(!list.length) return alert("Paste article numbers first.");
+  let type=$("cmpBulkType").value;
+  if(type==="Other/Custom") type=$("cmpBulkTypeCustom").value.trim();
+  if(!type) return alert("Choose an Issue type.");
+  const dateVal=$("cmpBulkDate").value;
+  const note=$("cmpBulkDesc").value.trim();
+  let status=$("cmpBulkStatus").value;
+  if(status==="Other/Custom") status=$("cmpBulkStatusCustom").value.trim()||"Open";
+
+  const ev = {date: dateVal || new Date().toLocaleDateString(), ts:new Date().toLocaleString(), note};
+  list.forEach(article=>{
+    const idx = complaints.findIndex(c=>c.article===article);
+    if(idx>=0){
+      complaints[idx].type=type; complaints[idx].status=status;
+      complaints[idx].timeline = complaints[idx].timeline||[]; complaints[idx].timeline.push(ev);
+    }else{
+      complaints.push({article, type, status, timeline:[ev]});
+    }
+  });
+  saveComplaints(); renderComplaints(); logAudit("complaint.bulkAdd",{count:list.length,type,status});
+  alert(`Applied to ${list.length} article(s).`);
+}
+function clearComplaintBulk(){
+  $("cmpBulkArticles").value=""; $("cmpBulkType").value=""; $("cmpBulkTypeCustom").value="";
+  $("cmpBulkDate").value=""; $("cmpBulkDesc").value="";
+  $("cmpBulkStatus").value=""; $("cmpBulkStatusCustom").value="";
+  $("cmpBulkTypeCustom").classList.add("hidden"); $("cmpBulkStatusCustom").classList.add("hidden");
+}
+
+/* Bulk change status for selected complaint rows (with Other/Custom) */
 function applyComplaintBulk(){
-  const s=$("cmpBulkStatus").value; if(!s) return alert("Choose a status.");
+  let s=$("cmpRowBulkStatus").value;
+  if(!s) return alert("Choose a status.");
+  if(s==="Other/Custom") s=$("cmpRowBulkStatusCustom").value.trim()||"Open";
   const ids=[...document.querySelectorAll('#cmpTable tbody input[type="checkbox"]:checked')].map(ch=>+ch.dataset.id);
   ids.forEach(i=> complaints[i].status=s);
-  saveComplaints(); renderComplaints(); logAudit("complaint.bulk",{count:ids.length,status:s});
+  saveComplaints(); renderComplaints(); logAudit("complaint.bulkStatus",{count:ids.length,status:s});
 }
+
+/* Export complaints */
 function exportComplaints(){
   const ws=XLSX.utils.json_to_sheet(complaints.map(c=>({
     article:c.article, type:c.type, status:c.status,
-    timeline:(c.timeline||[]).map(ev=>`${ev.ts}: ${ev.note}`).join(" | ")
+    timeline:(c.timeline||[]).map(ev=>`${(ev.date||"")} ${ev.ts?`(${ev.ts})`:""}: ${ev.note}`).join(" | ")
   })));
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Complaints"); XLSX.writeFile(wb,"complaints.xlsx");
 }
@@ -1133,20 +1203,19 @@ function renderAudit(){
   addInlineFilters(tbl);
 }
 
-/* =================== Import: Local XLSX + CSV fallback =================== */
-async function ensureXLSX(){ return !!window.XLSX; } // local file already loaded in <head>
+/* =================== Import: Self-hosted XLSX + CSV fallback =================== */
+async function ensureXLSX(){ return !!window.XLSX; } // local file loaded in <head>
 
-/* Lightweight RFC4180 CSV parser (handles quotes, commas, CR/LF) */
+/* Lightweight RFC4180 CSV parser */
 function parseCSV(text){
   const rows = [];
   let row = [], field = '';
   let i = 0, inQuotes = false;
-
   while (i < text.length){
     const c = text[i];
     if (inQuotes){
       if (c === '"'){
-        if (text[i+1] === '"'){ field += '"'; i += 2; continue; } // escaped quote
+        if (text[i+1] === '"'){ field += '"'; i += 2; continue; }
         inQuotes = false; i++; continue;
       } else { field += c; i++; continue; }
     } else {
@@ -1187,9 +1256,7 @@ window.handleFile = async function handleFile(){
           if(headerRow === -1) throw new Error("No plausible header row found in CSV.");
           const headers = aoa[headerRow].map(h => String(h||"").trim());
           const rowsAOA = aoa.slice(headerRow+1).filter(r => r.some(v => String(v).trim() !== ""));
-          const arr = rowsAOA.map(r => {
-            const o = {}; headers.forEach((h,idx)=> o[h] = r[idx] ?? ""); return o;
-          });
+          const arr = rowsAOA.map(r => { const o={}; headers.forEach((h,idx)=> o[h] = r[idx] ?? ""); return o; });
           importRows(arr);
         }catch(err){
           console.error("CSV import error:", err);
@@ -1241,7 +1308,6 @@ function importRows(arr){
   const batchId = $("batchName").value.trim() || ("Batch_"+new Date().toISOString().slice(0,10));
   const batchType = $("batchType").value;
   const mode = $("importMode").value;
-
   if(mode==="replace" && !confirm("Replace ALL rows?")) return;
   if(mode==="replace") rows = [];
 
@@ -1257,7 +1323,6 @@ function importRows(arr){
   };
   const norm = s=>_normKey(s);
   const normTemplate = enabled.map(k=>({key:k, n:norm(k)}));
-
   const sample = arr[0] || {};
   const headerMap = {};
   Object.keys(sample).forEach(sc=>{
