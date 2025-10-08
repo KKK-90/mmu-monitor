@@ -5,16 +5,34 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>MMU-Monitoring Dashboard</title>
 
-<!-- CDN deps kept minimal for GitHub Pages -->
-<!-- XLSX with automatic fallback -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.3/xlsx.full.min.js"
-        onerror="(function(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js';document.head.appendChild(s);}())">
+<!-- ===== Core CDNs (GitHub Pages friendly) ===== -->
+
+<!-- XLSX (Excel) with a fallback CDN -->
+<script id="xlsx-cdn" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.3/xlsx.full.min.js"></script>
+<script>
+  (function(){
+    const first = document.getElementById('xlsx-cdn');
+    first.addEventListener('error', function () {
+      // 2nd attempt: jsDelivr
+      var s2 = document.createElement('script');
+      s2.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js';
+      s2.onerror = function(){
+        // 3rd attempt: unpkg
+        var s3 = document.createElement('script');
+        s3.src = 'https://unpkg.com/xlsx@0.19.3/dist/xlsx.full.min.js';
+        document.head.appendChild(s3);
+      };
+      document.head.appendChild(s2);
+    });
+  })();
 </script>
 
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.3/xlsx.full.min.js"></script>
+<!-- jsPDF & autotable -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.3/jspdf.plugin.autotable.min.js"></script>
+
+<!-- Chart.js & dayjs -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.13/dayjs.min.js"></script>
 
@@ -130,7 +148,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
 .grid{display:grid;gap:14px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
 
-/* Margins — keep minimal on the left (requirement #8) */
+/* Margins — keep minimal on the left */
 .wrap{padding-left:8px;padding-right:8px}
 
 /* Small helpers */
@@ -139,6 +157,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
 </style>
 </head>
 <body class="theme-dark">
+
 
 <!-- =================== LOGIN (matches screenshot) =================== -->
 <div id="loginScreen" class="login-host">
@@ -171,8 +190,6 @@ tr:hover td{background:rgba(255,255,255,.03)}
     </div>
 
     <div id="lgErr" class="err hidden"></div>
-
-
   </div>
 </div>
 
@@ -180,12 +197,15 @@ tr:hover td{background:rgba(255,255,255,.03)}
 <div id="appHeader" class="header hidden">
   <div class="wrap header-inner">
     <div class="brand">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="url(#g)"><defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#f4c969"/><stop offset="1" stop-color="#f2b537"/></linearGradient></defs><path d="M12 2l4 4-4 4-4-4 4-4zm0 6l4 4-4 4-4-4 4-4zm0 6l4 4-4 4-4-4 4-4z"/></svg>
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="url(#g)">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#f4c969"/><stop offset="1" stop-color="#f2b537"/></linearGradient></defs>
+        <path d="M12 2l4 4-4 4-4-4 4-4zm0 6l4 4-4 4-4-4 4-4zm0 6l4 4-4 4-4-4 4-4z"/>
+      </svg>
       <div>MMU-Monitoring Dashboard</div>
     </div>
 
     <div class="head-center">
-      <!-- Alerts moved to header -->
+      <!-- Alerts in header -->
       <div class="bell">
         <button id="alertBtn" class="btn">Alerts <span id="alertCount" class="count hidden">0</span></button>
         <div id="alertMenu" class="alert-menu"></div>
@@ -202,10 +222,10 @@ tr:hover td{background:rgba(255,255,255,.03)}
 
 <!-- =================== MAIN =================== -->
 <div id="appMain" class="wrap grid hidden">
-  <!-- Tabs (refined) -->
+  <!-- Tabs -->
   <div class="tabs" id="tabs"></div>
 
-  <!-- ===== Data management (Upload, Manual, Templates, Backup/Restore) ===== -->
+  <!-- ===== Data management ===== -->
   <section class="card" data-tab="Data management">
     <h3>Data Management</h3>
 
@@ -217,9 +237,9 @@ tr:hover td{background:rgba(255,255,255,.03)}
           <input id="batchName" placeholder="Batch name e.g., Daily_2025-10-07"/>
           <select id="batchType"><option>ad-hoc</option><option>daily</option><option>weekly</option><option selected>monthly</option></select>
           <select id="importMode"><option value="append" selected>Append</option><option value="replace">Replace all</option></select>
-          <button class="btn" onclick="handleFile()">Import</button>
+          <button type="button" class="btn" onclick="window.handleFile()">Import</button>
         </div>
-        <div class="badge" style="margin-top:6px">Tip: first row must be headers. We auto-map case/underscores to template keys.</div>
+        <div class="badge" style="margin-top:6px">Tip: header row can use hyphens or underscores; the importer maps to the template automatically.</div>
       </div>
 
       <div class="card">
@@ -237,14 +257,13 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <div class="card">
         <h4>Backup & Restore</h4>
         <div class="row">
-          <button class="btn" onclick="downloadBackup()">Backup</button>
+          <button class="btn" onclick="downloadBackup()">Backup JSON</button>
           <label class="row">Restore:
             <input type="file" accept=".json" onchange="restoreBackup(event)"/>
           </label>
         </div>
         <div class="badge" style="margin-top:6px">
-          Backup downloads one JSON file containing: rows, template, complaints, rules, audit, settings, and profile.  
-          Restore loads that JSON and overwrites in-browser data.
+          Backup includes rows, template, complaints, rules, audit, settings, and profile. Restore overwrites in-browser data.
         </div>
       </div>
     </div>
@@ -254,7 +273,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
   <section class="card" data-tab="Dashboard">
     <h3>Analytics</h3>
     <div class="cards">
-      <div class="card"><div class="badge">Total (in scope filters)</div><div class="kpi" id="kpiTotal">0</div></div>
+      <div class="card"><div class="badge">Total (in scope)</div><div class="kpi" id="kpiTotal">0</div></div>
       <div class="card"><div class="badge">Delivered</div><div class="kpi" id="kpiDelivered">0</div></div>
       <div class="card"><div class="badge">Pending (&gt; SLA)</div><div class="kpi" id="kpiAged">0</div></div>
       <div class="card"><div class="badge">Exceptions</div><div class="kpi" id="kpiException">0</div></div>
@@ -266,11 +285,11 @@ tr:hover td{background:rgba(255,255,255,.03)}
     </div>
   </section>
 
-  <!-- ===== Bulk View & Update (renamed) ===== -->
+  <!-- ===== Bulk View & Update ===== -->
   <section class="card" data-tab="Bulk View & Update">
     <h3>Bulk View & Update</h3>
 
-    <!-- Bulk controls moved ABOVE the table -->
+    <!-- Bulk controls at the TOP -->
     <div class="row" style="margin-bottom:6px">
       <label class="row">Bulk Status:
         <select id="bulkStatus">
@@ -319,7 +338,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="table-wrap" style="margin-top:8px"><table id="reportTable"></table></div>
   </section>
 
-  <!-- ===== Complaints (enhanced) ===== -->
+  <!-- ===== Complaints ===== -->
   <section class="card" data-tab="Complaints">
     <h3>Complaints & Issues</h3>
     <div class="row">
@@ -389,7 +408,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
           <option value="role">By Role</option><option value="never">Never</option><option value="always">Always</option>
         </select>
       </label>
-      <!-- Scope moved out of header (requirement #15) -->
+      <!-- Scope moved out of header -->
       <label>Default Scope – Region:
         <select id="scopeRegion" onchange="persistProfile();refreshAll()"><option value="">All</option></select>
       </label>
@@ -400,10 +419,9 @@ tr:hover td{background:rgba(255,255,255,.03)}
   </section>
 </div>
 
-<script>
 
-  
-// --- Header detection & normalization helpers ---
+<script>
+/* =================== Small helpers (normalizers/detectors) =================== */
 function _normKey(s){
   return String(s||"")
     .trim()
@@ -414,33 +432,51 @@ function _normKey(s){
     .replace(/-+/g,"-");
 }
 function _looksLikeHeaderRow(cells){
-  // at least 3 non-empty cells, mostly textual (avoid pure numbers)
   const nonEmpty = cells.filter(v => String(v).trim() !== "");
   if (nonEmpty.length < 3) return false;
   const textish = nonEmpty.filter(v => isNaN(Number(String(v).trim())));
   return textish.length / nonEmpty.length >= 0.6;
 }
-function _detectHeaderRow(aoa){
-  for (let i = 0; i < aoa.length; i++){
-    if (_looksLikeHeaderRow(aoa[i])) return i;
+
+
+/* Lightweight RFC4180 CSV parser (handles quotes, commas, CR/LF) */
+function parseCSV(text){
+  const rows = [];
+  let row = [], field = '';
+  let i = 0, inQuotes = false;
+
+  while (i < text.length){
+    const c = text[i];
+
+    if (inQuotes){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i += 2; continue; } // escaped quote
+        inQuotes = false; i++; continue;
+      } else {
+        field += c; i++; continue;
+      }
+    } else {
+      if (c === '"'){ inQuotes = true; i++; continue; }
+      if (c === ','){ row.push(field); field = ''; i++; continue; }
+      if (c === '\r'){
+        // handle CRLF as single newline
+        if (text[i+1] === '\n') i++;
+        row.push(field); rows.push(row); row = []; field = ''; i++; continue;
+      }
+      if (c === '\n'){ row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
+      field += c; i++;
+    }
   }
-  return -1;
-}
-function _rowsFromAOA(aoa, headerRowIndex){
-  const headers = aoa[headerRowIndex].map(h => String(h||"").trim());
-  const rows = aoa.slice(headerRowIndex+1).filter(r => r.some(v => String(v).trim() !== ""));
-  return rows.map(r => {
-    const o = {};
-    headers.forEach((h, idx) => { o[h] = r[idx] ?? ""; });
-    return o;
-  });
+  // push last field/row
+  row.push(field); rows.push(row);
+  // trim trailing blank row if present
+  if (rows.length && rows[rows.length-1].length === 1 && rows[rows.length-1][0] === '') rows.pop();
+  return rows;
 }
 
 
-  
-  
-  
-  /* ======================= Constants & localStorage keys ======================= */
+
+/* ======================= Constants & localStorage keys ======================= */
 const DEFAULT_COLUMNS = [
  "customer-id","customer-name","customer-type-id","customer-type","contract-id",
  "payment-mode-code","payment_mode_description","book-channel-id","book-channel-name",
@@ -461,7 +497,7 @@ let settings={ defaultPeriod:"monthly", allowDelete:"role" };
 let charts={}, alertTimer=null;
 const $=id=>document.getElementById(id);
 
-/* ======================= Auth (client-side) ======================= */
+/* ======================= Auth (client-side demo) ======================= */
 function enc(s){return new TextEncoder().encode(s)}
 async function sha256(text){ const buf=await crypto.subtle.digest("SHA-256",enc(text)); return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("") }
 function seedUsersIfEmpty(){
@@ -514,13 +550,11 @@ function can(action){
 }
 function applyRole(){
   $("chipUser").textContent = profile.username || "—";
-  // Admin-only tabs visible?
   toggleTab("Audit", can("seeAudit"));
   toggleTab("Settings", can("seeSettings"));
-  // editor protections
   document.querySelector('[data-tab="SLA Rules"]').classList.toggle("hidden", !can("rulesEdit") && !can("seeSettings"));
   $("btnDelete").classList.toggle("hidden", !can("delete"));
-  buildTemplateEditor(); // rebuild with disabled controls if needed
+  buildTemplateEditor();
 }
 function toggleTab(name, show){
   const allTabs=[...document.querySelectorAll("#tabs .tab")];
@@ -545,75 +579,130 @@ function activateTab(name,btn){
   document.querySelectorAll("[data-tab]").forEach(sec=>{ sec.style.display=(sec.getAttribute("data-tab")===name)?"block":"none"; });
 }
 
-
-  async function ensureXLSX(){
-  if (window.XLSX) return;
-  // wait up to ~5s for the script to finish loading
-  await new Promise((resolve, reject)=>{
+/* ======================= XLSX readiness & Import ======================= */
+async function ensureXLSX(){
+  if (window.XLSX) return true;
+  // wait up to ~10s for any CDN to finish
+  const ok = await new Promise((resolve) => {
     let tries = 0;
     const t = setInterval(()=>{
-      if (window.XLSX){ clearInterval(t); resolve(); }
-      else if (++tries > 50){ clearInterval(t); reject(new Error("XLSX library failed to load")); }
+      if (window.XLSX){ clearInterval(t); resolve(true); }
+      else if (++tries > 100){ clearInterval(t); resolve(false); }
     }, 100);
   });
+  return ok; // true if XLSX available, false if not
 }
+  
 
-/* ======================= Upload / Import (fix) ======================= */
 
+window.handleFile = async function handleFile(){
+  try {
+    const input = document.getElementById("fileInput");
+    const f = input && input.files && input.files[0];
+    if(!f) { alert("Choose a file first."); return; }
 
-async function handleFile(){
-  await ensureXLSX();  // <-- guarantees XLSX is defined before use
+    const isCSV = /\.csv$/i.test(f.name) || (f.type && f.type.includes('csv'));
 
-  if(!can("import")) return alert("Not allowed by role.");
-  const f = document.getElementById("fileInput").files[0];
-  if(!f) return alert("Choose a file first.");
+    // Try to ensure XLSX if not CSV
+    const xlsxReady = isCSV ? false : await ensureXLSX();
 
-  const reader = new FileReader();
-  reader.onerror = () => alert("Could not read the file.");
-  reader.onload = (e) => {
-    try{
-      const data = new Uint8Array(e.target.result);
-      const wb = XLSX.read(data, { type: "array", cellDates: true, raw: false });
-
-      // pick the first sheet with data
-      let ws = null, chosenSheet = null;
-      for(const name of wb.SheetNames){
-        const w = wb.Sheets[name];
-        if (w && w['!ref']) { ws = w; chosenSheet = name; break; }
-      }
-      if(!ws){ throw new Error("Workbook has no populated sheets."); }
-
-      // AOA so we can pick the first non-empty row as header
-      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false, raw: false });
-      if(!aoa || !aoa.length) throw new Error(`Sheet "${chosenSheet}" is empty.`);
-
-      // find the first non-empty row (>=3 non-empty cells) and treat as header
-      let headerRow = -1;
-      for(let i=0;i<aoa.length;i++){
-        const nonEmpty = aoa[i].filter(v => String(v).trim() !== "");
-        if(nonEmpty.length >= 3){ headerRow = i; break; }
-      }
-      if(headerRow === -1) throw new Error(`No plausible header row found in "${chosenSheet}".`);
-
-      const headers = aoa[headerRow].map(h => String(h||"").trim());
-      const rowsAOA = aoa.slice(headerRow+1).filter(r => r.some(v => String(v).trim() !== ""));
-
-      const arr = rowsAOA.map(r => {
-        const o = {};
-        headers.forEach((h,idx)=> o[h] = r[idx] ?? "");
-        return o;
-      });
-
-      console.log("Import diagnostics:", {sheet: chosenSheet, headerRow, headerSample: headers.slice(0,10)});
-      importRows(arr); // mapping + saving happens inside
-    }catch(err){
-      console.error("Import error:", err);
-      alert(`File parse error: ${err.message || err}`);
+    if (!xlsxReady && !isCSV){
+      // XLSX blocked; guide the user & allow CSV import
+      alert(
+        "Excel parsing library (XLSX) couldn't be loaded from all CDNs.\n\n" +
+        "Quick workaround: open your Excel file and Save As → CSV, then upload the CSV here.\n\n" +
+        "Tip: You can also keep this page and try again later from a different network."
+      );
+      return;
     }
-  };
-  reader.readAsArrayBuffer(f);
-}
 
+    // CSV path (no library required)
+    if (isCSV || !xlsxReady){
+      const reader = new FileReader();
+      reader.onerror = () => alert("Could not read the CSV file.");
+      reader.onload = (e) => {
+        try{
+          const text = e.target.result;
+          const aoa = parseCSV(text);
+          if (!aoa.length) throw new Error("CSV appears empty.");
+          // find header as first non-empty row with >=3 cells
+          let headerRow = -1;
+          for(let i=0;i<aoa.length;i++){
+            const nonEmpty = aoa[i].filter(v => String(v).trim() !== "");
+            if(nonEmpty.length >= 3){ headerRow = i; break; }
+          }
+          if(headerRow === -1) throw new Error("No plausible header row found in CSV.");
+          const headers = aoa[headerRow].map(h => String(h||"").trim());
+          const rowsAOA = aoa.slice(headerRow+1).filter(r => r.some(v => String(v).trim() !== ""));
+          const arr = rowsAOA.map(r => {
+            const o = {};
+            headers.forEach((h,idx)=> o[h] = r[idx] ?? "");
+            return o;
+          });
+          console.log("CSV import diagnostics:", {headerRow, headerSample: headers.slice(0,12)});
+          importRows(arr);
+        }catch(err){
+          console.error("CSV import error:", err);
+          alert(`CSV parse error: ${err.message || err}`);
+        }
+      };
+      reader.readAsText(f);
+      return;
+    }
+
+    // XLSX path (library available)
+    const reader = new FileReader();
+    reader.onerror = () => alert("Could not read the Excel file.");
+    reader.onload = (e) => {
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: "array", cellDates: true, raw: false });
+
+        // pick first sheet with data
+        let ws = null, chosenSheet = null;
+        for(const name of wb.SheetNames){
+          const w = wb.Sheets[name];
+          if (w && w['!ref']) { ws = w; chosenSheet = name; break; }
+        }
+        if(!ws) throw new Error("Workbook has no populated sheets.");
+
+        // AOA parse; first plausible row is header
+        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false, raw: false });
+        if(!aoa || !aoa.length) throw new Error(`Sheet "${chosenSheet}" is empty.`);
+
+        let headerRow = -1;
+        for(let i=0;i<aoa.length;i++){
+          const nonEmpty = aoa[i].filter(v => String(v).trim() !== "");
+          if(nonEmpty.length >= 3){ headerRow = i; break; }
+        }
+        if(headerRow === -1) throw new Error(`No plausible header row found in "${chosenSheet}".`);
+
+        const headers = aoa[headerRow].map(h => String(h||"").trim());
+        const rowsAOA = aoa.slice(headerRow+1).filter(r => r.some(v => String(v).trim() !== ""));
+        const arr = rowsAOA.map(r => {
+          const o = {};
+          headers.forEach((h,idx)=> o[h] = r[idx] ?? "");
+          return o;
+        });
+
+        console.log("XLSX import diagnostics:", {sheet: chosenSheet, headerRow, headerSample: headers.slice(0,12)});
+        importRows(arr);
+      }catch(err){
+        console.error("Excel import error:", err);
+        alert(`File parse error: ${err.message || err}`);
+      }
+    };
+    reader.readAsArrayBuffer(f);
+
+  } catch (e) {
+    console.error(e);
+    alert(e.message || String(e));
+  }
+};
+
+
+  
+  /* ======================= Import mapping & persist ======================= */
 function importRows(arr){
   const batchId = document.getElementById("batchName").value.trim() || ("Batch_"+new Date().toISOString().slice(0,10));
   const batchType = document.getElementById("batchType").value;
@@ -622,16 +711,10 @@ function importRows(arr){
   if(mode==="replace" && !confirm("Replace ALL rows?")) return;
   if(mode==="replace") rows = [];
 
-
   const enabled = template.filter(c=>c.enabled).map(c=>c.key);
 
   // normalizer: "booking_date time" -> "booking-date-time"
-  const norm = s => String(s||"")
-    .trim().toLowerCase()
-    .replace(/[._/]+/g,"-")
-    .replace(/\s+/g,"-")
-    .replace(/[^a-z0-9-]/g,"")
-    .replace(/-+/g,"-");
+  const norm = s => _normKey(s);
 
   const aliases = {
     "bookingdatetime":"booking-date-time",
@@ -669,9 +752,7 @@ function importRows(arr){
     headerMap[sc] = soft ? soft.key : sc;
   });
 
-  
-
-  // de-dup and validation counters
+  // counters
   let dup=0, miss=0, add=0;
   const existing = new Set(rows.map(r=>String(r["article-number"]||"")));
 
@@ -684,10 +765,8 @@ function importRows(arr){
     r._batchId = batchId;
     r._batchType = batchType;
 
-    // normalize status casing if present
     if(r["DELIVERY STATUS"]) r["DELIVERY STATUS"] = String(r["DELIVERY STATUS"]).toUpperCase();
 
-    // required checks
     if(REQUIRED.some(k=>!String(r[k]||"").trim())) miss++;
 
     const key = String(r["article-number"]||"");
@@ -699,10 +778,6 @@ function importRows(arr){
   logAudit("import", {batchId,batchType,mode,added:add,duplicates:dup,missing:miss});
   alert(`Imported ${add} row(s).\nDuplicates: ${dup}\nMissing requireds flagged: ${miss}\nBatch: ${batchId} (${batchType})`);
 }
-
-
-  
-  
 
 /* ======================= Manual Entry ======================= */
 function buildManualForm(){
@@ -799,7 +874,7 @@ function buildReport(){
 function reportExport(fmt){ const tbl=$("reportTable"); if(!tbl.rows.length) return alert("Build a report first."); const headers=[...tbl.querySelectorAll("thead th")].map(th=>th.textContent); const body=[...tbl.querySelectorAll("tbody tr")].map(tr=>[...tr.children].map(td=>td.textContent)); if(fmt==="pdf"){ const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:"landscape"}); doc.text("Report",14,12); doc.autoTable({head:[headers],body,startY:16,styles:{fontSize:8}}); doc.save("report.pdf"); } else if(fmt==="xlsx"){ const json=body.map(row=>Object.fromEntries(row.map((v,i)=>[headers[i],v]))); const ws=XLSX.utils.json_to_sheet(json); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Report"); XLSX.writeFile(wb,"report.xlsx"); } else { const ws=XLSX.utils.aoa_to_sheet([headers,...body]); const csv=XLSX.utils.sheet_to_csv(ws); const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="report.csv"; a.click(); } }
 function countBy(key,arr=rows){ const map={}; arr.forEach(r=>{ const k=r[key]||"—"; map[k]=(map[k]||0)+1; }); return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0])); }
 
-/* ======================= Complaints (with statuses & bulk) ======================= */
+/* ======================= Complaints ======================= */
 function pillForStatus(s){
   const map={Open:'#f59e0b', 'In-Progress':'#60a5fa', Escalated:'#ef4444', Resolved:'#34d399', Closed:'#a3a3a3', 'Re-opened':'#f59e0b'};
   const c=map[s]||'#e5e7eb'; return `<span class="pill" style="border-color:${c};color:${c}">${s}</span>`;
@@ -864,7 +939,7 @@ function restoreBackup(e){
   reader.readAsText(f);
 }
 
-/* ======================= Alerts (header, real-time) ======================= */
+/* ======================= Alerts (header, “real-time”) ======================= */
 function computeAlerts(){
   const missing=rows.filter(r=> REQUIRED.some(k=>!String(r[k]||"").trim()));
   const dupKeys=new Set(); const seen=new Set();
@@ -878,12 +953,11 @@ function computeAlerts(){
 }
 function renderAlertsHeader(){
   const m=$("alertMenu"); const items=computeAlerts(); m.innerHTML=items.map(i=>`<div class="item">${i.label}</div>`).join("");
-  // count
   const total=items.reduce((a,i)=> a + (parseInt(i.label.match(/(\d+)/)?.[1]||0)), 0);
   const c=$("alertCount"); if(total>0){ c.textContent=total; c.classList.remove("hidden"); } else { c.classList.add("hidden"); }
   [...m.querySelectorAll(".item")].forEach((el,idx)=> el.onclick=()=>{ items[idx].action(); m.classList.remove("active"); });
 }
-$("alertBtn").onclick=()=>{ $("alertMenu").classList.toggle("active"); };
+document.getElementById("alertBtn").onclick=()=>{ document.getElementById("alertMenu").classList.toggle("active"); };
 
 /* ======================= Init / Refresh ======================= */
 function refreshAll(){
@@ -896,7 +970,6 @@ function boot(){
   loadAll();
   if(!rules.length){ rules=[{scope:"GLOBAL",key:"GLOBAL",hours:72}]; saveRules(); }
   buildTabs(); applyRole(); buildTemplateEditor(); refreshAll();
-  // refresh alerts every 5s for "real-time"
   if(alertTimer) clearInterval(alertTimer); alertTimer=setInterval(renderAlertsHeader, 5000);
 }
 boot();
