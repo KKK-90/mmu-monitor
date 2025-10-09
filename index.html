@@ -129,9 +129,10 @@ button.btn{
   border-color: rgba(200,157,42,.6);
   box-shadow: inset 0 0 0 2px rgba(200,157,42,.25);
 }
-#alertsSlot{margin-left:auto;position:relative}
+
+#alertsSlot { position: relative; z-index: 50; }
 #alertMenu{
-  position:absolute; right:0; top:36px; min-width:320px;
+  position:absolute; right:0; top:36px; min-width:320px; z-index: 9999;
 }
 
 /* Tables: full borders + inline filters row (glass) */
