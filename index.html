@@ -1436,6 +1436,12 @@ function boot(){
   alertTimer=setInterval(renderAlertsHeader, 5000);
 }
 boot();
+    document.addEventListener('click', (e)=>{
+    const slot = document.getElementById('alertsSlot');
+    const menu = document.getElementById('alertMenu');
+    if (!slot || !menu) return;
+    if (!slot.contains(e.target)) menu.classList.add('hidden');
+  });
 </script>
 </body>
 </html>
