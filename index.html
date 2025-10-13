@@ -86,17 +86,24 @@ body{
 .kpi-value{ font-size:26px; font-weight:900; color:#111827; margin-top:6px }
 .kpi-sub{ font-size:12px; color:#6b7280; margin-top:2px }
 
-/* Info icon + tooltip */
-.info{ display:inline-flex; align-items:center; justify-content:center;
+/* Info icon + tooltip (click-to-open, top-right) */
+.info{
+  position:absolute; top:8px; right:8px;
+  display:inline-flex; align-items:center; justify-content:center;
   width:18px; height:18px; border-radius:999px; font-size:12px;
   background:var(--glass-hover); border:1px solid var(--border); cursor:pointer;
+  z-index:1;
 }
 .tooltip{
-  position:absolute; z-index:9999; max-width:320px; inset:auto auto auto 0;
-  transform:translateY(6px); background:var(--glass); border:1px solid var(--border);
-  border-radius:10px; padding:10px; box-shadow:var(--shadow); color:#111827; font-size:12px; display:none;
+  position:absolute; top:32px; right:8px; z-index:9999;
+  max-width:320px;
+  background:var(--glass); border:1px solid var(--border);
+  border-radius:10px; padding:10px; box-shadow:var(--shadow);
+  color:#111827; font-size:12px; display:none;
 }
-.kpi-card:hover .tooltip, .kpi-card .tooltip.show{ display:block }
+/* click only (no hover): show when .show is present */
+.kpi-card .tooltip.show{ display:block }
+
 
 /* KPI chart block header (with toggle) */
 .block-head{ display:flex; align-items:center; gap:10px; justify-content:space-between; margin-bottom:6px }
@@ -240,6 +247,136 @@ tr.filter-row th, tr.filter-row td{
 .login-actions{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:center;margin-top:14px}
 .login-actions .sub{color:#6b7280;text-align:left}
 .err{color:#b91c1c;font-weight:700;margin-top:8px}
+
+/* ===== Dynamic Color Coding (Global) ===== */
+:root{
+  --ok-bg:#ecfdf5;     --ok-br:#bbf7d0;
+  --warn-bg:#fff7ed;   --warn-br:#fde68a;
+  --err-bg:#fef2f2;    --err-br:#fecaca;
+  --info-bg:#eef2ff;   --info-br:#c7d2fe;
+}
+
+/* KPI tiles (Dashboard quick KPIs) */
+.tile.k-ok   { background:var(--ok-bg);   border-color:var(--ok-br); }
+.tile.k-warn { background:var(--warn-bg); border-color:var(--warn-br); }
+.tile.k-err  { background:var(--err-bg);  border-color:var(--err-br); }
+.tile.k-info { background:var(--info-bg); border-color:var(--info-br); }
+
+/* KPI cards (KPIs tab – if you’re using .kpi-card) */
+.kpi-card.k-ok   { background:var(--ok-bg);   border-color:var(--ok-br); }
+.kpi-card.k-warn { background:var(--warn-bg); border-color:var(--warn-br); }
+.kpi-card.k-err  { background:var(--err-bg);  border-color:var(--err-br); }
+.kpi-card.k-info { background:var(--info-bg); border-color:var(--info-br); }
+
+/* Table row coloring (Bulk View & Update / Reports / any table with DELIVERY STATUS) */
+tr.row-ok   { background:var(--ok-bg);   }
+tr.row-warn { background:var(--warn-bg); }
+tr.row-err  { background:var(--err-bg);  }
+tr.row-info { background:var(--info-bg); }
+
+/* Slightly tint borders for colored rows */
+tr.row-ok   > td { border-color:var(--ok-br); }
+tr.row-warn > td { border-color:var(--warn-br); }
+tr.row-err  > td { border-color:var(--err-br); }
+tr.row-info > td { border-color:var(--info-br); }
+
+/* Optional: small legend badge you can reuse if desired */
+.badge-legend{
+  display:inline-block; padding:2px 8px; border-radius:999px; font-weight:700; font-size:12px; margin-right:6px;
+  border:1px solid currentColor; color:#111827; background:#fff;
+}
+.badge-ok{   background:var(--ok-bg);   color:#065f46; border-color:var(--ok-br);}
+.badge-warn{ background:var(--warn-bg); color:#92400e; border-color:var(--warn-br);}
+.badge-err{  background:var(--err-bg);  color:#991b1b; border-color:var(--err-br);}
+.badge-info{ background:var(--info-bg); color:#1e3a8a; border-color:var(--info-br);}
+
+/* === Force KPI tooltips to be opaque for readability (surgical override) === */
+.kpi-card .tooltip{
+  background: #ffffff !important;     /* solid, no transparency */
+  border-color: #e5e7eb !important;   /* soft gray border */
+  color: #111827 !important;          /* high contrast text */
+  backdrop-filter: none !important;   /* remove glass blur */
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 12px 40px rgba(2,6,23,.12); /* slightly stronger shadow for separation */
+}
+
+/* KPI cards */
+.kpi-card .kpi-title{
+  /* allow natural & forced wraps */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+
+  /* show max 2 lines then ellipsis */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+
+  /* responsive size that won’t shout */
+  font-size: clamp(14px, 1.6vw, 16px);
+  line-height: 1.25;
+}
+
+.kpi-card .kpi-value{
+  /* scale with card width but never too tiny/huge */
+  font-size: clamp(22px, 3.2vw, 38px);
+  line-height: 1.05;
+  letter-spacing: -0.02em; /* tiny tighten for large digits */
+}
+
+.kpi-card .kpi-sub{
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+
+  /* up to 2 lines */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+
+  font-size: clamp(11px, 1.2vw, 12px);
+  line-height: 1.25;
+}
+
+/* If you also want this on the quick KPI tiles on the Dashboard */
+.tile .badge{
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tile .kpi{
+  font-size: clamp(22px, 3vw, 36px);
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+
+/* ——— KPIs header legend ——— */
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.legend-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.legend-item{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;
+  background:var(--glass-strong);border:1px solid var(--border);color:#111827
+}
+.legend-item svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+
+/* Color skins (re-use your existing variables) */
+.legend-ok   { background:var(--ok-bg);   border-color:var(--ok-br);   color:#166534; }
+.legend-warn { background:var(--warn-bg); border-color:var(--warn-br); color:#92400e; }
+.legend-err  { background:var(--err-bg);  border-color:var(--err-br);  color:#991b1b; }
+.legend-info { background:var(--info-bg); border-color:var(--info-br); color:#1e3a8a; }
+
+.section-head{ margin-bottom:48px; }
+#kpiSubTabs{ margin-bottom:48px; }
+
 </style>
 </head>
 <body>
@@ -265,13 +402,18 @@ tr.filter-row th, tr.filter-row td{
       </div>
     </div>
 
-    <div class="login-actions">
-      <div class="sub">Change password</div>
-      <div class="sub" style="text-align:right">Forgot password?</div>
+<div class="login-actions">
+  <div class="sub">
+    <a href="javascript:void(0)" onclick="startChangePassword()">Change password</a>
+  </div>
+  <div class="sub" style="text-align:right">
+    <a href="javascript:void(0)" onclick="startForgot()">Forgot password?</a>
+  </div>
 
-      <button class="btn ghost" onclick="clearLogin()">Clear</button>
-      <button class="btn" onclick="doLogin()">Log in</button>
-    </div>
+  <button class="btn ghost" onclick="clearLogin()">Clear</button>
+  <button class="btn" onclick="doLogin()">Log in</button>
+</div>
+
 
     <div id="lgErr" class="err hidden"></div>
   </div>
@@ -429,10 +571,52 @@ tr.filter-row th, tr.filter-row td{
 
   <!-- ===== KPIs (Admin+ only via RBAC) ===== -->
 <section class="card" data-tab="KPIs">
-  <h3>KPIs</h3>
+<div class="section-head">
+  <h3 style="margin:0">KPIs</h3>
+
+  <div class="legend-inline" aria-label="Color legend">
+    <span class="legend-label">Color code:</span>
+    <!-- Delivered -->
+    <span class="legend-item legend-ok" title="Delivered / On-time">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M8 12l3 3 5-6"></path>
+      </svg>
+      Delivered
+    </span>
+
+    <!-- Pending > SLA -->
+    <span class="legend-item legend-warn" title="Pending beyond SLA">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M12 6v6l4 2"></path>
+      </svg>
+      Pending&nbsp;>&nbsp;SLA
+    </span>
+
+    <!-- Exception -->
+    <span class="legend-item legend-err" title="Exception / Return / Breach">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3l9 16H3z"></path>
+        <path d="M12 9v4M12 17h.01"></path>
+      </svg>
+      Exception
+    </span>
+
+    <!-- Info / Neutral -->
+    <span class="legend-item legend-info" title="Totals / Neutral">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M12 8h.01M11 12h2v4h-2z"></path>
+      </svg>
+      Info
+    </span>
+  </div>
+</div>
+
 
   <!-- Sub-tabs for KPI domains -->
-  <div class="row" id="kpiSubTabs" style="margin-bottom:8px"></div>
+  <div class="row" id="kpiSubTabs" style="margin-bottom:48px"></div>
 
   <!-- Panel host -->
   <div id="kpiPanel" class="grid"></div>
@@ -697,6 +881,13 @@ function togglePw(){ const i=$("lgPass"); i.type = (i.type==="password"?"text":"
 function clearLogin(){ $("lgUser").value=""; $("lgPass").value=""; }
 function showLgErr(msg){ const el=$("lgErr"); el.textContent=msg; el.classList.remove("hidden"); setTimeout(()=>el.classList.add("hidden"),4000); }
 
+function startChangePassword(){
+  showLgErr("Change password will be enabled in Phase 2 (server-backed).");
+}
+function startForgot(){
+  showLgErr("Forgot password will be enabled in Phase 2 (email/OTP).");
+}
+  
 async function doLogin(){
   const u = $("lgUser").value.trim(), p = $("lgPass").value;
   const users = JSON.parse(localStorage.getItem(LS.USERS) || "[]");
@@ -1478,6 +1669,7 @@ function refreshKPIs(){
   }).length;
   const exception=inScope.filter(r=>String(r["DELIVERY STATUS"]||"").toUpperCase()==="EXCEPTION").length;
   $("kpiTotal").textContent=total; $("kpiDelivered").textContent=delivered; $("kpiAged").textContent=aged; $("kpiException").textContent=exception;
+  applyKpiColoring();   // 🔹 colorize KPI tiles dynamically
 }
 function chart(id,cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart(document.getElementById(id),cfg); }
 function refreshCharts(){
@@ -1489,6 +1681,7 @@ function refreshCharts(){
   chart("chartByRegion",{type:"bar",data:{labels:regs,datasets:[{label:"Articles",data:byReg}]},options:{plugins:{legend:{display:false}}}});
   const map={}; inScope.forEach(r=>{ const d=(String(r["booking-date-time"]||"").substring(0,10))||""; if(!d) return; map[d]=(map[d]||0)+1; }); const dates=Object.keys(map).sort();
   chart("chartTrend",{type:"line",data:{labels:dates,datasets:[{label:"Articles",data:dates.map(d=>map[d])}]},options:{plugins:{legend:{display:false}}}});
+  
 }
 
 /* =================== Backup / Restore =================== */
@@ -1528,6 +1721,7 @@ function refreshAll(){
   renderComplaints();
   buildRuleTable();
   renderAuditIfVisible();
+  applyDynamicRowColors(document);   // 🔹 color all tables dynamically
   refreshKPIs();
   refreshCharts();
   renderAlertsHeader();
@@ -1538,6 +1732,126 @@ function refreshAll(){
     renderKpiCards(activeKpiDomain);
   }
 }
+
+/* ===== Dynamic Color Coding Helpers ===== */
+
+/* Robust status normalizer */
+function normStatus(raw){
+  const s = String(raw||'').trim().toUpperCase();
+  const c = s.replace(/[\s\-]+/g,'');
+  const any = (arr)=>arr.includes(s)||arr.includes(c);
+  if (any(['DELIVERED','DEL','DLVD','DELIVERYDONE'])) return 'DELIVERED';
+  if (any(['INTRANSIT','IN-TRANSIT','TRANSIT','OFD','OUTFORDELIVERY','DISPATCHED'])) return 'IN-TRANSIT';
+  if (any(['EXCEPTION','RTO','RTS','RETURN','RETURNTOORIGIN','LOST','DAMAGE','DAMAGED'])) return 'EXCEPTION';
+  return s || 'PENDING';
+}
+
+/* Default SLA picker (hours). If you have rules[], wire it here */
+function slaHoursForRow(/*row*/) { return 72; }
+
+/* Compute class from status + (optional) booking-date-time aging */
+function classFromStatus(statusText, bookingDateText){
+  const s = normStatus(statusText);
+  if (s === 'EXCEPTION') return 'row-err';
+  if (s === 'DELIVERED') return 'row-ok';
+
+  // Pending/Transit aging check
+  const d = new Date(bookingDateText || '');
+  if (!isNaN(+d)) {
+    const hours = (Date.now() - d.getTime()) / 36e5;
+    if (hours > slaHoursForRow({})) return 'row-warn';
+  }
+  return 'row-info';
+}
+
+/* Find header indexes by label (case-insensitive) */
+function headerIndexMap(tbl){
+  const headRow = tbl.querySelector('thead tr') || tbl.querySelector('tr');
+  if(!headRow) return {};
+  const labels = [...headRow.children].map(th=>String(th.textContent||'').trim().toUpperCase());
+  const idx = {};
+  labels.forEach((t,i)=> idx[t]=i);
+  return idx;
+}
+
+/* Apply row colors to any table that has a DELIVERY STATUS column */
+function applyDynamicRowColors(root=document){
+  const tables = root.querySelectorAll('table');
+  tables.forEach(tbl=>{
+    const idx = headerIndexMap(tbl);
+    const iStatus = idx['DELIVERY STATUS'];
+    if (iStatus == null) return; // skip tables without delivery status
+
+    // Accept various booking date header names
+    const iBook = [ 'BOOKING-DATE-TIME', 'BOOKING DATE TIME', 'BOOKING DATE', 'BOOKING_DATE' ]
+      .map(k=>idx[k]).find(i => i!=null);
+
+    const body = tbl.tBodies[0] || tbl;
+    [...body.querySelectorAll('tr')].forEach(tr=>{
+      const cells = [...tr.children];
+      if (!cells.length) return;
+      const statusText = (cells[iStatus]?.textContent||'').trim();
+      const bookText = (iBook!=null ? (cells[iBook]?.textContent||'').trim() : '');
+      const cls = classFromStatus(statusText, bookText);
+      tr.classList.remove('row-ok','row-warn','row-err','row-info');
+      tr.classList.add(cls);
+    });
+  });
+}
+
+/* Recolor on DOM changes inside hosts where tables update dynamically */
+function attachColorObservers(){
+  const targets = [
+    document.getElementById('bulkHost'),
+    document.getElementById('reportsHost'),
+    document.querySelector('[data-tab="Bulk View & Update"]'),
+    document.querySelector('[data-tab="Reports"]')
+  ].filter(Boolean);
+
+  const obs = new MutationObserver(()=>applyDynamicRowColors(document));
+  targets.forEach(t => obs.observe(t, {childList:true, subtree:true}));
+}
+
+/* Dashboard KPI tiles coloring (4 quick KPI tiles) */
+/* Dashboard KPI tiles coloring (supports both old & new IDs) */
+function applyKpiColoring(){
+  const tileOf = (id) => {
+    const el = document.getElementById(id);
+    return el ? el.closest('.tile') : null;
+  };
+  // Support both ID sets:
+  const tTotal     = tileOf('kpiTotal');
+  const tDelivered = tileOf('kpiDelivered');
+  // Pending / Aged tile (either ID)
+  const elPending  = document.getElementById('kpiPendingSla') || document.getElementById('kpiAged');
+  const tPending   = elPending ? elPending.closest('.tile') : null;
+  // Exceptions tile (either ID)
+  const elExc      = document.getElementById('kpiExceptions') || document.getElementById('kpiException');
+  const tExcept    = elExc ? elExc.closest('.tile') : null;
+
+  // Reset classes
+  [tTotal,tDelivered,tPending,tExcept].forEach(t=>{
+    if(!t) return;
+    t.classList.remove('k-ok','k-warn','k-err','k-info');
+  });
+
+  // Color logic
+  if (tDelivered) tDelivered.classList.add('k-ok');
+
+  if (tPending){
+    const v = parseInt((elPending?.textContent||'0').replace(/\D+/g,'')) || 0;
+    tPending.classList.add(v>0 ? 'k-warn' : 'k-info');
+  }
+
+  if (tExcept){
+    const v = parseInt((elExc?.textContent||'0').replace(/\D+/g,'')) || 0;
+    tExcept.classList.add(v>0 ? 'k-err' : 'k-info');
+  }
+
+  if (tTotal) tTotal.classList.add('k-info');
+}
+
+
 
 function boot(){
   loadTheme(); seedUsersIfEmpty();
@@ -1553,6 +1867,8 @@ function boot(){
   loadAll();
   if(!rules.length){ rules=[{scope:"GLOBAL",key:"GLOBAL",hours:72}]; saveRules(); }
   buildTabs(); applyRole(); buildTemplateEditor(); refreshAll();
+  bindEnterToLogin();              // ← add this line
+  attachColorObservers();   // 🔹 watch for DOM updates and recolor automatically
   if(alertTimer) clearInterval(alertTimer);
   alertTimer=setInterval(renderAlertsHeader, 5000);
 }
@@ -1678,20 +1994,26 @@ const KPIS = [
 
 /* Card renderer */
 function renderKpiCards(domain){
-  const host=$("kpiPanel");
-  host.innerHTML="";
-  const list = KPIS.filter(k=>k.domain===domain);
-  const grid = document.createElement("div"); grid.className="kpi-grid";
+  const host = $("kpiPanel");
+  host.innerHTML = "";
+  const list = KPIS.filter(k => k.domain === domain);
+  const grid = document.createElement("div"); grid.className = "kpi-grid";
+
   list.forEach(k=>{
     const res = k.compute();
-    const card = document.createElement("div"); card.className="kpi-card";
-    card.innerHTML = `
-      <div class="kpi-title">${k.title}
-        <span class="info" title="i" onclick="this.nextElementSibling.classList.toggle('show')">i</span>
-        <div class="tooltip">${k.desc}</div>
-      </div>
-      <div class="kpi-value">${res.value ?? '—'}</div>
-      ${res.sub? `<div class="kpi-sub">${res.sub}</div>`:''}
+    const card = document.createElement("div"); 
+    card.className = "kpi-card";
+card.innerHTML = `
+  <div class="kpi-title" title="${k.title}">
+    ${k.title}
+    <span class="info" onclick="this.nextElementSibling.classList.toggle('show')">i</span>
+    <div class="tooltip">${k.desc}</div>
+  </div>
+  <div class="kpi-value">${res.value ?? '—'}</div>
+  ${res.sub ? `<div class="kpi-sub" title="${res.sub}">${res.sub}</div>` : ''}
+      <span class="info" title="More info"
+        onclick="event.stopPropagation(); const t=this.nextElementSibling; document.querySelectorAll('.kpi-card .tooltip').forEach(x=>x!==t&&x.classList.remove('show')); t.classList.toggle('show');">i</span>
+      <div class="tooltip">${k.desc}</div>
     `;
     grid.appendChild(card);
   });
@@ -1702,6 +2024,16 @@ function renderKpiCards(domain){
   if(domain==='cust'){ renderParetoBlock('Top Customers by Volume','customer-name','chartKpiCust','kpiPanel'); }
   if(domain==='reg'){ renderParetoBlock('Regions by Volume','Region','chartKpiReg','kpiPanel'); }
   if(domain==='fin'){ renderParetoBlock('Top Customers by Revenue (Tariff)','customer-name','chartKpiFin','kpiPanel', true); }
+
+  // Dynamic coloring by title keywords
+  document.querySelectorAll('.kpi-card').forEach(card=>{
+    const title = (card.querySelector('.kpi-title')?.textContent||'').toUpperCase();
+    card.classList.remove('k-ok','k-warn','k-err','k-info');
+    if (title.includes('EXCEPTION') || title.includes('BREACH')) card.classList.add('k-err');
+    else if (title.includes('PENDING') || title.includes('AGED') || title.includes('> SLA')) card.classList.add('k-warn');
+    else if (title.includes('DELIVERED') || title.includes('ON-TIME')) card.classList.add('k-ok');
+    else card.classList.add('k-info');
+  });
 }
 
 /* Sub-tabs for KPI domains */
@@ -1913,15 +2245,48 @@ function initKpiTabOnce(){
   renderKpiCards(activeKpiDomain);
 }
 
+  /* Let Enter submit the login form */
+function bindEnterToLogin(){
+  var u = document.getElementById('lgUser');
+  var p = document.getElementById('lgPass');
+  if (u && !u.__enterBound) {
+    u.addEventListener('keydown', function(e){ if (e.key === 'Enter') doLogin(); });
+    u.__enterBound = true; // prevent double-binding
+  }
+  if (p && !p.__enterBound) {
+    p.addEventListener('keydown', function(e){ if (e.key === 'Enter') doLogin(); });
+    p.__enterBound = true;
+  }
+}
+
 
 
 boot();
-    document.addEventListener('click', (e)=>{
-    const slot = document.getElementById('alertsSlot');
-    const menu = document.getElementById('alertMenu');
-    if (!slot || !menu) return;
-    if (!slot.contains(e.target)) menu.classList.add('hidden');
-  });
+
+/* One global click handler (alerts + KPI info tooltips) */
+document.addEventListener('click', (e)=>{
+  // 1) Alerts dropdown: close when clicking outside
+  const slot = document.getElementById('alertsSlot');
+  const menu = document.getElementById('alertMenu');
+  if (slot && menu && !slot.contains(e.target)) {
+    menu.classList.add('hidden');
+  }
+
+  // 2) KPI info tooltips: close when clicking anywhere outside the icon/tooltip
+  const clickedInsideTooltip = e.target.closest('.kpi-card .tooltip');
+  const clickedInfoIcon      = e.target.closest('.kpi-card .info');
+  if (!clickedInsideTooltip && !clickedInfoIcon){
+    document.querySelectorAll('.kpi-card .tooltip.show').forEach(t => t.classList.remove('show'));
+  }
+});
+
+  // --- expose handlers for inline onclicks ---
+  window.togglePw = togglePw;
+  window.clearLogin = clearLogin;
+  window.doLogin = doLogin;
+  window.startChangePassword = startChangePassword;
+  window.startForgot = startForgot;
+
 </script>
 </body>
 </html>
