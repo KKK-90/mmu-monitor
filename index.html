@@ -75,6 +75,42 @@ body{
 .hidden{display:none!important}
 .right{margin-left:auto}
 
+/* ====== KPI widgets ====== */
+.kpi-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px }
+.kpi-card{
+  background: var(--glass-strong);
+  border:1px solid var(--border); border-radius:14px; padding:12px;
+  position:relative; min-height:84px;
+}
+.kpi-title{ font-size:12px; color:#374151; display:flex; align-items:center; gap:6px }
+.kpi-value{ font-size:26px; font-weight:900; color:#111827; margin-top:6px }
+.kpi-sub{ font-size:12px; color:#6b7280; margin-top:2px }
+
+/* Info icon + tooltip */
+.info{ display:inline-flex; align-items:center; justify-content:center;
+  width:18px; height:18px; border-radius:999px; font-size:12px;
+  background:var(--glass-hover); border:1px solid var(--border); cursor:pointer;
+}
+.tooltip{
+  position:absolute; z-index:9999; max-width:320px; inset:auto auto auto 0;
+  transform:translateY(6px); background:var(--glass); border:1px solid var(--border);
+  border-radius:10px; padding:10px; box-shadow:var(--shadow); color:#111827; font-size:12px; display:none;
+}
+.kpi-card:hover .tooltip, .kpi-card .tooltip.show{ display:block }
+
+/* KPI chart block header (with toggle) */
+.block-head{ display:flex; align-items:center; gap:10px; justify-content:space-between; margin-bottom:6px }
+.view-toggle button{ padding:6px 10px }
+.view-toggle .active{ box-shadow: inset 0 0 0 2px rgba(200,157,42,.25); border-color:rgba(200,157,42,.5) }
+
+/* Expand/collapse (office stats) */
+.disclosure{ cursor:pointer; user-select:none; }
+.disclosure .chev{ transition:.2s transform ease }
+.disclosure[aria-expanded="true"] .chev{ transform:rotate(90deg) }
+.collapsible{ display:none }
+.collapsible.show{ display:block }
+
+  
 /* Inputs / Buttons */
 input,select,textarea,button{
   background: var(--glass-strong);
@@ -391,6 +427,40 @@ tr.filter-row th, tr.filter-row td{
     <div class="table-wrap" style="margin-top:8px"><table id="reportTable"></table></div>
   </section>
 
+  <!-- ===== KPIs (Admin+ only via RBAC) ===== -->
+<section class="card" data-tab="KPIs">
+  <h3>KPIs</h3>
+
+  <!-- Sub-tabs for KPI domains -->
+  <div class="row" id="kpiSubTabs" style="margin-bottom:8px"></div>
+
+  <!-- Panel host -->
+  <div id="kpiPanel" class="grid"></div>
+
+  <!-- Office-wise stats (collapsed by default) -->
+  <div class="card" style="margin-top:10px">
+    <div id="officeDisclosure" class="disclosure row" aria-expanded="false" onclick="toggleOfficeBlock()">
+      <span class="chev">▶</span>
+      <strong>Office-wise Statistics (Booking & Delivery)</strong>
+      <span class="badge">collapsed</span>
+    </div>
+    <div id="officeBlock" class="collapsible">
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); margin-top:10px">
+        <div class="card">
+          <div class="block-head"><strong>Booking Offices — Volume & Trend</strong><div class="view-toggle" id="bookViewTog"></div></div>
+          <canvas id="chartOfficeBook"></canvas>
+        </div>
+        <div class="card">
+          <div class="block-head"><strong>Delivery Offices — Performance</strong><div class="view-toggle" id="delivViewTog"></div></div>
+          <canvas id="chartOfficeDeliv"></canvas>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:10px"><table id="officeTable"></table></div>
+    </div>
+  </div>
+</section>
+
+  
   <!-- ===== Complaints (dropdown Issue type + custom + date + bulk entry) ===== -->
   <section class="card" data-tab="Complaints">
     <h3>Complaints & Issues</h3>
@@ -586,10 +656,21 @@ function loadTheme(){ /* kept for future; currently always light */ }
 
 /* =================== Auth =================== */
 function enc(s){return new TextEncoder().encode(s)}
-async function sha256(text){ const buf=await crypto.subtle.digest("SHA-256",enc(text)); return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("") }
+async function sha256(text){
+  try{
+    if (window.crypto && crypto.subtle) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+      return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+    }
+  }catch(e){ /* ignore and fall back */ }
+  // Fallback for non-HTTPS or blocked crypto: mark as plain
+  return "PLAIN:" + text;
+}
+
 function seedUsersIfEmpty(){
   const cur = JSON.parse(localStorage.getItem(LS.USERS)||"[]");
-  if(cur.length) return;
+  if(cur.length) return; // already seeded
+
   const seeds=[
     {u:"superadmin",r:"Superadmin",p:"Super@123"},
     {u:"admin",r:"Admin",p:"Admin@123"},
@@ -597,9 +678,14 @@ function seedUsersIfEmpty(){
     {u:"operator",r:"Operator",p:"Oper@123"},
     {u:"viewer",r:"Viewer",p:"View@123"}
   ];
-  Promise.all(seeds.map(async s=>({user:s.u, role:s.r, hash:await sha256(s.p)})))
-    .then(list=>localStorage.setItem(LS.USERS, JSON.stringify(list)));
+
+  Promise.all(seeds.map(async s=>({
+    user: s.u,
+    role: s.r,
+    hash: await sha256(s.p)   // uses secure or fallback hashing depending on context
+  }))).then(list => localStorage.setItem(LS.USERS, JSON.stringify(list)));
 }
+
 
 function showApp(show){
   $("loginScreen").classList.toggle("hidden", show);
@@ -612,19 +698,31 @@ function clearLogin(){ $("lgUser").value=""; $("lgPass").value=""; }
 function showLgErr(msg){ const el=$("lgErr"); el.textContent=msg; el.classList.remove("hidden"); setTimeout(()=>el.classList.add("hidden"),4000); }
 
 async function doLogin(){
-  const u=$("lgUser").value.trim(), p=$("lgPass").value;
-  const users=JSON.parse(localStorage.getItem(LS.USERS)||"[]");
-  const found=users.find(x=>x.user===u);
-  if(!found) return showLgErr("Invalid username or password.");
-  const h=await sha256(p);
-  if(h!==found.hash) return showLgErr("Invalid username or password.");
-  profile.username=u; profile.role=found.role;
+  const u = $("lgUser").value.trim(), p = $("lgPass").value;
+  const users = JSON.parse(localStorage.getItem(LS.USERS) || "[]");
+  const found = users.find(x => x.user === u);
+  if (!found) return showLgErr("Invalid username or password.");
+
+  const h = await sha256(p);
+
+  // Accept both hashed and fallback ("PLAIN:password") user records
+  if (found.hash.startsWith("PLAIN:")) {
+    if ("PLAIN:" + p !== found.hash) return showLgErr("Invalid username or password.");
+  } else {
+    if (h !== found.hash) return showLgErr("Invalid username or password.");
+  }
+
+  // Success → set session/profile
+  profile.username = u; 
+  profile.role = found.role;
   localStorage.setItem(LS.PROFILE, JSON.stringify(profile));
-  localStorage.setItem(LS.SESSION, JSON.stringify({user:u, ts:Date.now()}));
-  $("chipUser").textContent=u;
+  localStorage.setItem(LS.SESSION, JSON.stringify({ user: u, ts: Date.now() }));
+
+  $("chipUser").textContent = u;
   showApp(true); buildTabs(); applyRole(); refreshAll();
-  logAudit("auth.login",{user:u});
+  logAudit("auth.login", { user: u });
 }
+
 function doLogout(){ localStorage.removeItem(LS.SESSION); logAudit("auth.logout",{user:profile.username}); location.reload(); }
 
 /* =================== Load/Save =================== */
@@ -675,6 +773,10 @@ function can(action){
 }
 function applyRole(){
   $("chipUser").textContent = profile.username || "—";
+  // KPIs only for Admin & Superadmin
+  const isAdminPlus = (ROLE[profile.role] >= ROLE.Admin);
+  toggleTab("KPIs", isAdminPlus);
+
   toggleTab("Audit", can("seeAudit"));
   toggleTab("Settings", can("seeSettings"));
   const delBtn=$("btnDelete"); if(delBtn) delBtn.classList.toggle("hidden", !can("delete"));
@@ -689,7 +791,7 @@ function toggleTab(name, show){
 }
 
 /* =================== Tabs =================== */
-const TAB_ORDER = ["Dashboard","Data management","Bulk View & Update","Reports","Complaints","SLA Rules","Audit","Settings"];
+const TAB_ORDER = ["Dashboard","KPIs","Data management","Bulk View & Update","Reports","Complaints","SLA Rules","Audit","Settings"];
 function buildTabs(){
   const host=$("tabs"); host.innerHTML="";
   TAB_ORDER.forEach((name,i)=>{
@@ -704,10 +806,15 @@ function buildTabs(){
 function activateTab(name, btn){
   document.querySelectorAll("#tabs .tab").forEach(t=>t.classList.remove("active"));
   if(btn) btn.classList.add("active");
+
   document.querySelectorAll("[data-tab]").forEach(sec=>{
     sec.style.display = (sec.getAttribute("data-tab")===name) ? "block" : "none";
   });
+
+  // NEW: initialize the KPI sub-UI the first time KPIs tab is opened
+  if (name === "KPIs") { initKpiTabOnce(); }
 }
+
 
 /* =================== INLINE FILTERS — FIXED =================== */
 /* Build a filter row with inputs carrying data-col=<absolute column index>.
@@ -1415,9 +1522,23 @@ function restoreBackup(e){
 /* =================== Init =================== */
 function renderAuditIfVisible(){ if(can("seeAudit")) renderAudit(); }
 function refreshAll(){
-  buildOptions(); buildManualForm(); renderTable(); renderComplaints(); buildRuleTable(); renderAuditIfVisible();
-  refreshKPIs(); refreshCharts(); renderAlertsHeader();
+  buildOptions();
+  buildManualForm();
+  renderTable();
+  renderComplaints();
+  buildRuleTable();
+  renderAuditIfVisible();
+  refreshKPIs();
+  refreshCharts();
+  renderAlertsHeader();
+
+  // NEW: if user is looking at KPIs, re-render them to reflect latest data
+  const kpiSection = document.querySelector('[data-tab="KPIs"]');
+  if (kpiSection && kpiSection.style.display === "block") {
+    renderKpiCards(activeKpiDomain);
+  }
 }
+
 function boot(){
   loadTheme(); seedUsersIfEmpty();
   const session=JSON.parse(localStorage.getItem(LS.SESSION)||"null");
@@ -1435,6 +1556,365 @@ function boot(){
   if(alertTimer) clearInterval(alertTimer);
   alertTimer=setInterval(renderAlertsHeader, 5000);
 }
+
+
+/* =============== KPI registry & helpers =============== */
+
+/* Common selectors for sub-tabs (domains) */
+const KPI_DOMAINS = [
+  {id:"op",   label:"Operational"},
+  {id:"sla",  label:"Performance & SLA"},
+  {id:"fin",  label:"Financial"},
+  {id:"cust", label:"Customer & Channel"},
+  {id:"reg",  label:"Regional & Network"},
+  {id:"qual", label:"Quality & Complaints"},
+  {id:"comp", label:"Compliance & Governance"},
+  {id:"drv",  label:"Derived & Forecast"}
+];
+let activeKpiDomain = "op";
+
+/* Normalize status (same helper idea you okayed earlier) */
+function kpiNormStatus(raw, row){
+  const s = String(raw||"").trim().toUpperCase();
+  const c = s.replace(/[\s-]+/g,'');
+  const yes = (set)=> set.has(s) || set.has(c);
+  if(yes(new Set(['DELIVERED','DEL','DLVD','DELIVERYDONE']))) return 'DELIVERED';
+  if(yes(new Set(['INTRANSIT','IN-TRANSIT','TRANSIT','OFD','OUTFORDELIVERY','DISPATCHED']))) return 'IN-TRANSIT';
+  if(yes(new Set(['EXCEPTION','RTO','RTS','RETURN','RETURNTOORIGIN','LOST','DAMAGE','DAMAGED']))) return 'EXCEPTION';
+  if(row && row['DELIVERY DATE']) return 'DELIVERED';
+  return 'PENDING';
+}
+function kpiInScope(){ return rows.filter(scopeFilter); }
+function hoursBetween(a,b){ const d1=dayjs(a), d2=dayjs(b); if(!d1.isValid()||!d2.isValid()) return null; return d2.diff(d1,"hour"); }
+function groupCount(arr, key){ const m={}; arr.forEach(r=>{ const v=r[key]||"—"; m[v]=(m[v]||0)+1; }); return m; }
+function sum(arr, key){ return arr.reduce((a,r)=> a + (+r[key]||0), 0); }
+
+/* ----- KPI definitions ----- */
+/* Each KPI: { id, domain, title, desc, compute(): {value, sub?}, format? }  */
+const KPIS = [
+  // 1) Operational
+  {id:'op_total', domain:'op', title:'Total Articles', desc:'All articles in the current scope (filters in Settings).',
+    compute:()=>({value:kpiInScope().length})},
+  {id:'op_delivered', domain:'op', title:'Delivered', desc:'Count of articles with “DELIVERED” status.',
+    compute:()=>({value:kpiInScope().filter(r=>kpiNormStatus(r['DELIVERY STATUS'],r)==='DELIVERED').length})},
+  {id:'op_intransit', domain:'op', title:'In-Transit', desc:'Count with “IN-TRANSIT”.',
+    compute:()=>({value:kpiInScope().filter(r=>kpiNormStatus(r['DELIVERY STATUS'],r)==='IN-TRANSIT').length})},
+  {id:'op_pending', domain:'op', title:'Pending (<SLA)', desc:'Not delivered/exception and within SLA.',
+    compute:()=>({value:kpiInScope().filter(r=>{const s=kpiNormStatus(r['DELIVERY STATUS'],r); if(['DELIVERED','EXCEPTION'].includes(s))return false; const d=dayjs(r['booking-date-time']); return dayjs().diff(d,'hour')<=slaHoursFor(r);}).length})},
+  {id:'op_aged', domain:'op', title:'Pending (>SLA)', desc:'Backlog that exceeded SLA.',
+    compute:()=>({value:kpiInScope().filter(r=>{const s=kpiNormStatus(r['DELIVERY STATUS'],r); if(['DELIVERED','EXCEPTION'].includes(s))return false; const d=dayjs(r['booking-date-time']); return dayjs().diff(d,'hour')>slaHoursFor(r);}).length})},
+  {id:'op_exception', domain:'op', title:'Exceptions', desc:'RTO/RTS/Lost/Damage etc.',
+    compute:()=>({value:kpiInScope().filter(r=>kpiNormStatus(r['DELIVERY STATUS'],r)==='EXCEPTION').length})},
+  {id:'op_book_today', domain:'op', title:'Booked Today', desc:'Articles with booking-date = today.',
+    compute:()=>({value:kpiInScope().filter(r=>String(r['booking-date-time']||'').slice(0,10)===dayjs().format('YYYY-MM-DD')).length})},
+  {id:'op_type_mix', domain:'op', title:'Type Mix', desc:'Distribution by article-type (top categories).',
+    compute:()=>{const m=groupCount(kpiInScope(),'article-type'); const top=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,5); return {value:top.map(([k,v])=>`${k}: ${v}`).join('  •  '), sub:'Top 5'};}},
+
+  // 2) Performance & SLA
+  {id:'sla_avg', domain:'sla', title:'Avg Delivery Time (h)', desc:'Average hours from booking to delivery for delivered articles.',
+    compute:()=>{const d=kpiInScope().filter(r=>kpiNormStatus(r['DELIVERY STATUS'],r)==='DELIVERED'); const arr=d.map(r=>hoursBetween(r['booking-date-time'], r['DELIVERY DATE'])).filter(x=>x!=null); const v=arr.length?Math.round(arr.reduce((a,b)=>a+b,0)/arr.length):0; return {value:v};}},
+  {id:'sla_median', domain:'sla', title:'Median Delivery (h)', desc:'50th percentile delivery time among delivered.',
+    compute:()=>{const d=kpiInScope().filter(r=>kpiNormStatus(r['DELIVERY STATUS'],r)==='DELIVERED'); const arr=d.map(r=>hoursBetween(r['booking-date-time'], r['DELIVERY DATE'])).filter(x=>x!=null).sort((a,b)=>a-b); const mid=Math.floor(arr.length/2); const v=arr.length?(arr.length%2?arr[mid]:Math.round((arr[mid-1]+arr[mid])/2)):0; return {value:v};}},
+  {id:'sla_otd', domain:'sla', title:'On-Time Delivery %', desc:'(Delivered ≤ SLA / Delivered) × 100.',
+    compute:()=>{const d=kpiInScope().filter(r=>kpiNormStatus(r['DELIVERY STATUS'],r)==='DELIVERED'); const ok=d.filter(r=>hoursBetween(r['booking-date-time'], r['DELIVERY DATE'])<=slaHoursFor(r)); const v=d.length?Math.round(ok.length/d.length*100):0; return {value:`${v}%`};}},
+  {id:'sla_breach', domain:'sla', title:'SLA Breach %', desc:'(Delivered beyond SLA + Pending > SLA) / Total × 100.',
+    compute:()=>{const all=kpiInScope(); const delivered=all.filter(r=>kpiNormStatus(r['DELIVERY STATUS'],r)==='DELIVERED'); const late=delivered.filter(r=>hoursBetween(r['booking-date-time'], r['DELIVERY DATE'])>slaHoursFor(r)); const aged=all.filter(r=>{const s=kpiNormStatus(r['DELIVERY STATUS'],r); if(['DELIVERED','EXCEPTION'].includes(s))return false; return dayjs().diff(dayjs(r['booking-date-time']),'hour')>slaHoursFor(r);}); const v=all.length?Math.round((late.length+aged.length)/all.length*100):0; return {value:`${v}%`};}},
+  // Delivery office wise performance (KPIs in the office table/chart block; card shows a headline)
+  {id:'sla_best_office', domain:'sla', title:'Best Delivery Office (OTD%)', desc:'Office with highest on-time delivery rate.',
+    compute:()=>{const map={}; kpiInScope().forEach(r=>{const off=String(r['destination-office-name']||'—'); map[off] = map[off]||{del:0,ok:0}; if(kpiNormStatus(r['DELIVERY STATUS'],r)==='DELIVERED'){ map[off].del++; if(hoursBetween(r['booking-date-time'], r['DELIVERY DATE'])<=slaHoursFor(r)) map[off].ok++; }}); const arr=Object.entries(map).map(([o,v])=>[o, v.del?Math.round(v.ok/v.del*100):0]).sort((a,b)=>b[1]-a[1]); const top=arr[0]||['—',0]; return {value:`${top[0]} (${top[1]}%)`, sub:'On-Time %'};}},
+
+  // 3) Financial
+  {id:'fin_tariff', domain:'fin', title:'Total Tariff', desc:'Sum of tariff (₹).',
+    compute:()=>({value:`₹ ${sum(kpiInScope(),'tariff').toLocaleString()}`})},
+  {id:'fin_avg_tariff', domain:'fin', title:'Avg Tariff / Article', desc:'Total tariff divided by article count.',
+    compute:()=>{const n=kpiInScope().length; const v=n? (sum(kpiInScope(),'tariff')/n):0; return {value:`₹ ${Math.round(v).toLocaleString()}`};}},
+  {id:'fin_cod_total', domain:'fin', title:'Total COD Booked', desc:'Sum of vp-cod-value.',
+    compute:()=>{const s=sum(kpiInScope().filter(r=>String(r['vp-cod-type']||'').toUpperCase()==='COD'),'vp-cod-value'); return {value:`₹ ${Math.round(s).toLocaleString()}`};}},
+  {id:'fin_cod_pending', domain:'fin', title:'COD Pending', desc:'COD value for non-delivered articles.',
+    compute:()=>{const s=sum(kpiInScope().filter(r=>String(r['vp-cod-type']||'').toUpperCase()==='COD' && kpiNormStatus(r['DELIVERY STATUS'],r)!=='DELIVERED'),'vp-cod-value'); return {value:`₹ ${Math.round(s).toLocaleString()}`};}},
+  {id:'fin_high_value', domain:'fin', title:'High-Value Articles', desc:'Count of articles with tariff > ₹5000.',
+    compute:()=>({value:kpiInScope().filter(r=>(+r['tariff']||0)>5000).length})},
+
+  // 4) Customer & Channel
+  {id:'cust_top_vol', domain:'cust', title:'Top Customer by Volume', desc:'Customer with highest article count.',
+    compute:()=>{const m=groupCount(kpiInScope(),'customer-name'); const top=Object.entries(m).sort((a,b)=>b[1]-a[1])[0]||['—',0]; return {value:`${top[0]} (${top[1]})`};}},
+  {id:'cust_type_split', domain:'cust', title:'Bulk vs Retail', desc:'Share by customer-type.',
+    compute:()=>{const m=groupCount(kpiInScope(),'customer-type'); const e=Object.entries(m).sort((a,b)=>b[1]-a[1]); return {value:e.map(([k,v])=>`${k}: ${v}`).join(' • ')};}},
+  {id:'channel_mix', domain:'cust', title:'Booking Channel Mix', desc:'Share by book-channel-name.',
+    compute:()=>{const m=groupCount(kpiInScope(),'book-channel-name'); const e=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,4); return {value:e.map(([k,v])=>`${k}: ${v}`).join(' • '), sub:'Top 4'};}},
+
+  // 5) Regional & Network
+  {id:'reg_pincodes', domain:'reg', title:'Unique Destination PINs', desc:'Coverage breadth.',
+    compute:()=>({value:[...new Set(kpiInScope().map(r=>r['destination-pin']).filter(Boolean))].length})},
+  {id:'reg_region_deliv', domain:'reg', title:'Best Region (Delivery %)', desc:'Delivered / Total by Region.',
+    compute:()=>{const inS=kpiInScope(); const by={}; inS.forEach(r=>{const g=r.Region||'—'; by[g]=by[g]||{t:0,d:0}; by[g].t++; if(kpiNormStatus(r['DELIVERY STATUS'],r)==='DELIVERED') by[g].d++;}); const arr=Object.entries(by).map(([k,v])=>[k, v.t?Math.round(v.d/v.t*100):0]).sort((a,b)=>b[1]-a[1]); const top=arr[0]||['—',0]; return {value:`${top[0]} (${top[1]}%)`};}},
+
+  // 6) Quality & Complaints
+  {id:'qual_open', domain:'qual', title:'Open Complaints', desc:'Open + In-Progress.',
+    compute:()=>({value:complaints.filter(c=>['Open','In-Progress'].includes(c.status)).length})},
+  {id:'qual_closed', domain:'qual', title:'Closed Complaints', desc:'Resolved + Closed.',
+    compute:()=>({value:complaints.filter(c=>['Resolved','Closed'].includes(c.status)).length})},
+  {id:'qual_reopen', domain:'qual', title:'Re-opened', desc:'Cases re-opened.',
+    compute:()=>({value:complaints.filter(c=>c.status==='Re-opened').length})},
+  {id:'qual_top_type', domain:'qual', title:'Top Complaint Type', desc:'Most frequent complaint type.',
+    compute:()=>{const m={}; complaints.forEach(c=>m[c.type]=(m[c.type]||0)+1); const top=Object.entries(m).sort((a,b)=>b[1]-a[1])[0]||['—',0]; return {value:`${top[0]} (${top[1]})`};}},
+
+  // 7) Compliance & Governance
+  {id:'comp_apt_missing', domain:'comp', title:'APT 2.0 Missing', desc:'Articles with blank APT 2.0 updation.',
+    compute:()=>({value:kpiInScope().filter(r=>!String(r['APT 2.O updation']||'').trim()).length})},
+  {id:'comp_required_missing', domain:'comp', title:'Mandatory Fields Missing', desc:'Any of required fields empty.',
+    compute:()=>({value:kpiInScope().filter(r=>REQUIRED.some(k=>!String(r[k]||'').trim())).length})},
+  {id:'comp_audit_events', domain:'comp', title:'Audit Events (7d)', desc:'Number of actions logged in last 7 days.',
+    compute:()=>{const cutoff=dayjs().subtract(7,'day'); return {value:audit.filter(a=>dayjs(a.ts).isAfter(cutoff)).length};}},
+
+  // 8) Derived & Forecast
+  {id:'drv_eff_ratio', domain:'drv', title:'Delivery Efficiency', desc:'Delivered / (Delivered + Pending).',
+    compute:()=>{const inS=kpiInScope(); const del=inS.filter(r=>kpiNormStatus(r['DELIVERY STATUS'],r)==='DELIVERED').length; const pend=inS.filter(r=>!['DELIVERED','EXCEPTION'].includes(kpiNormStatus(r['DELIVERY STATUS'],r))).length; const v=(del+pend)?Math.round(del/(del+pend)*100):0; return {value:`${v}%`};}},
+  {id:'drv_return_ratio', domain:'drv', title:'Return Ratio', desc:'RTS/RTO vs Delivered.',
+    compute:()=>{const inS=kpiInScope(); const del=inS.filter(r=>kpiNormStatus(r['DELIVERY STATUS'],r)==='DELIVERED').length; const ret=inS.filter(r=>kpiNormStatus(r['DELIVERY STATUS'],r)==='EXCEPTION').length; const v=del? (ret/del*100):0; return {value:`${v.toFixed(1)}%`};}},
+  {id:'drv_growth_mom', domain:'drv', title:'MoM Growth (Bookings)', desc:'(This month − Last month)/Last month.',
+    compute:()=>{const m=dayjs().format('YYYY-MM'), lm=dayjs().subtract(1,'month').format('YYYY-MM'); const cnt=(tag)=>kpiInScope().filter(r=>String(r['booking-date-time']||'').startsWith(tag)).length; const a=cnt(m), b=cnt(lm); const v=b? Math.round((a-b)/b*100):0; return {value:`${v}%`};}}
+];
+
+/* Card renderer */
+function renderKpiCards(domain){
+  const host=$("kpiPanel");
+  host.innerHTML="";
+  const list = KPIS.filter(k=>k.domain===domain);
+  const grid = document.createElement("div"); grid.className="kpi-grid";
+  list.forEach(k=>{
+    const res = k.compute();
+    const card = document.createElement("div"); card.className="kpi-card";
+    card.innerHTML = `
+      <div class="kpi-title">${k.title}
+        <span class="info" title="i" onclick="this.nextElementSibling.classList.toggle('show')">i</span>
+        <div class="tooltip">${k.desc}</div>
+      </div>
+      <div class="kpi-value">${res.value ?? '—'}</div>
+      ${res.sub? `<div class="kpi-sub">${res.sub}</div>`:''}
+    `;
+    grid.appendChild(card);
+  });
+  host.appendChild(grid);
+
+  // Append domain-specific blocks (charts/tables)
+  if(domain==='sla'){ renderOfficeBlocks(); }
+  if(domain==='cust'){ renderParetoBlock('Top Customers by Volume','customer-name','chartKpiCust','kpiPanel'); }
+  if(domain==='reg'){ renderParetoBlock('Regions by Volume','Region','chartKpiReg','kpiPanel'); }
+  if(domain==='fin'){ renderParetoBlock('Top Customers by Revenue (Tariff)','customer-name','chartKpiFin','kpiPanel', true); }
+}
+
+/* Sub-tabs for KPI domains */
+function buildKpiSubTabs(){
+  const bar=$("kpiSubTabs"); bar.innerHTML="";
+  KPI_DOMAINS.forEach(d=>{
+    const b=document.createElement("button");
+    b.className="tab"+(d.id===activeKpiDomain?" active":"");
+    b.textContent=d.label;
+    b.onclick=()=>{ activeKpiDomain=d.id; [...bar.children].forEach(x=>x.classList.remove('active')); b.classList.add('active'); renderKpiCards(activeKpiDomain); };
+    bar.appendChild(b);
+  });
+}
+
+/* Pareto/Line toggle block for a field (or tariff sum) */
+function renderParetoBlock(title, field, chartId, attachToId, sumTariff=false){
+  const wrap=document.createElement("div"); wrap.className="card"; wrap.style.marginTop="10px";
+  const head=document.createElement("div"); head.className="block-head";
+  head.innerHTML=`<strong>${title}</strong><div class="view-toggle"><button class="btn active" data-view="pareto">Pareto</button><button class="btn" data-view="line">Line</button></div>`;
+  const cv=document.createElement("canvas"); cv.id=chartId;
+  wrap.appendChild(head); wrap.appendChild(cv);
+  document.getElementById(attachToId).appendChild(wrap);
+
+  const inS=kpiInScope();
+  const map={};
+  if(sumTariff){
+    inS.forEach(r=>{ const k=r[field]||'—'; map[k]=(map[k]||0)+(+r.tariff||0); });
+  }else{
+    inS.forEach(r=>{ const k=r[field]||'—'; map[k]=(map[k]||0)+1; });
+  }
+  const arr=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const labels=arr.map(a=>a[0]); const values=arr.map(a=>a[1]);
+
+  const togg=head.querySelector('.view-toggle');
+  let mode='pareto';
+  const draw=()=>{
+    if(charts[chartId]) charts[chartId].destroy();
+    if(mode==='pareto'){
+      // Pareto: bars + cumulative %
+      const total = values.reduce((a,b)=>a+b,0)||1;
+      let cum=0; const cumPct=values.map(v=>{ cum+=v; return +(cum/total*100).toFixed(1); });
+      charts[chartId]=new Chart(cv, {
+        type:'bar',
+        data:{ labels, datasets:[{label: sumTariff?'Tariff':'Count', data: values, yAxisID:'y'}, {label:'Cumulative %', data:cumPct, type:'line', yAxisID:'y1'}]},
+        options:{ responsive:true, scales:{y:{beginAtZero:true}, y1:{beginAtZero:true, position:'right', max:100}}, plugins:{legend:{position:'bottom'}}}
+      });
+    }else{
+      charts[chartId]=new Chart(cv, {
+        type:'line', data:{labels, datasets:[{label: sumTariff?'Tariff':'Count', data:values}]},
+        options:{plugins:{legend:{position:'bottom'}}}
+      });
+    }
+  };
+  togg.querySelectorAll('button').forEach(b=> b.onclick=()=>{ togg.querySelectorAll('button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); mode=b.dataset.view; draw(); });
+  draw();
+}
+
+/* Office-wise block (booking volume + delivery performance) */
+function toggleOfficeBlock(){
+  const d=$("officeDisclosure"); const b=$("officeBlock");
+  const open=d.getAttribute('aria-expanded')==='true';
+  d.setAttribute('aria-expanded', String(!open));
+  d.querySelector('.badge').textContent = !open ? 'expanded' : 'collapsed';
+  b.classList.toggle('show', !open);
+  if(!open) renderOfficeBlocks(); // draw when opened
+}
+
+function renderOfficeBlocks(){
+  // Charts toggles (Pareto default)
+  buildViewToggle('bookViewTog', (view)=>drawOfficeBook(view));
+  buildViewToggle('delivViewTog', (view)=>drawOfficeDeliv(view));
+
+  drawOfficeBook('pareto');
+  drawOfficeDeliv('pareto');
+
+  // Table (booking & delivery KPIs per office)
+  const tbl=$("officeTable");
+  const byBook = groupCount(kpiInScope(),'booking-office-name');
+  // delivery KPI per destination office: OTD%
+  const mapDel={};
+  kpiInScope().forEach(r=>{
+    const off=r['destination-office-name']||'—';
+    mapDel[off]=mapDel[off]||{del:0, ok:0, exc:0};
+    const s=kpiNormStatus(r['DELIVERY STATUS'],r);
+    if(s==='DELIVERED'){ mapDel[off].del++; if(hoursBetween(r['booking-date-time'], r['DELIVERY DATE'])<=slaHoursFor(r)) mapDel[off].ok++; }
+    if(s==='EXCEPTION') mapDel[off].exc++;
+  });
+  const head=`<thead><tr><th>Booking Office</th><th>Booked</th><th>Delivery Office</th><th>Delivered</th><th>On-Time %</th><th>Exceptions</th></tr></thead>`;
+  const bodyRows=[];
+  const bookArr=Object.entries(byBook).sort((a,b)=>b[1]-a[1]).slice(0,20);
+  const delArr=Object.entries(mapDel).map(([k,v])=>[k,v.del,v.del?Math.round(v.ok/v.del*100):0,v.exc]).sort((a,b)=>b[1]-a[1]).slice(0,20);
+  const max=Math.max(bookArr.length, delArr.length);
+  for(let i=0;i<max;i++){
+    const L=bookArr[i]||['—','']; const R=delArr[i]||['—','','',''];
+    bodyRows.push(`<tr><td>${L[0]}</td><td>${L[1]}</td><td>${R[0]}</td><td>${R[1]}</td><td>${R[2]}</td><td>${R[3]}</td></tr>`);
+  }
+  tbl.innerHTML = head + `<tbody>${bodyRows.join('')}</tbody>`;
+  addInlineFilters(tbl);
+}
+function buildViewToggle(hostId, cb){
+  const host=$(hostId); host.innerHTML=`<button class="btn active" data-v="pareto">Pareto</button><button class="btn" data-v="line">Line</button>`;
+  host.querySelectorAll('button').forEach(b=> b.onclick=()=>{ host.querySelectorAll('button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); cb(b.dataset.v); });
+}
+
+
+// --- REPLACE ONLY THESE TWO FUNCTIONS START ---
+
+function drawOfficeBook(view){
+  const cv = $("chartOfficeBook");
+  if (charts.officeBook) charts.officeBook.destroy();
+
+  const map = groupCount(kpiInScope(), 'booking-office-name');
+  const arr = Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const labels = arr.map(a=>a[0]);
+  const values = arr.map(a=>a[1]);
+
+  if (view === 'pareto'){
+    const total = values.reduce((a,b)=>a+b,0) || 1;
+    let cum = 0;
+    const cumPct = values.map(v => { cum += v; return +(cum/total*100).toFixed(1); });
+
+    charts.officeBook = new Chart(cv, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Booked', data: values, yAxisID: 'y' },
+          { label: 'Cumulative %', data: cumPct, type: 'line', yAxisID: 'y1' }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true }, y1: { beginAtZero: true, position: 'right', max: 100 } },
+        plugins: { legend: { position: 'bottom' } }
+      }
+    });
+  } else {
+    charts.officeBook = new Chart(cv, {
+      type: 'line',
+      data: { labels, datasets: [ { label: 'Booked', data: values } ] },
+      options: { plugins: { legend: { position: 'bottom' } } }
+    });
+  }
+}
+
+function drawOfficeDeliv(view){
+  const cv = $("chartOfficeDeliv");
+  if (charts.officeDeliv) charts.officeDeliv.destroy();
+
+  // compute On-Time Delivery % per delivery office
+  const map = {};
+  kpiInScope().forEach(r=>{
+    const k = r['destination-office-name'] || '—';
+    map[k] = map[k] || { del:0, ok:0 };
+    const s = kpiNormStatus(r['DELIVERY STATUS'], r);
+    if (s === 'DELIVERED'){
+      map[k].del++;
+      if (hoursBetween(r['booking-date-time'], r['DELIVERY DATE']) <= slaHoursFor(r)) map[k].ok++;
+    }
+  });
+
+  const arr = Object.entries(map)
+    .map(([k,v]) => [k, v.del ? Math.round(v.ok/v.del*100) : 0])
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,12);
+
+  const labels = arr.map(a=>a[0]);
+  const values = arr.map(a=>a[1]);
+
+  if (view === 'pareto'){
+    const total = values.reduce((a,b)=>a+b,0) || 1;
+    let cum = 0;
+    const cumPct = values.map(v => { cum += v; return +(cum/total*100).toFixed(1); });
+
+    charts.officeDeliv = new Chart(cv, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'On-Time %', data: values, yAxisID: 'y' },
+          { label: 'Cumulative %', data: cumPct, type: 'line', yAxisID: 'y1' }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true, max: 100 }, y1: { beginAtZero: true, position: 'right', max: 100 } },
+        plugins: { legend: { position: 'bottom' } }
+      }
+    });
+  } else {
+    charts.officeDeliv = new Chart(cv, {
+      type: 'line',
+      data: { labels, datasets: [ { label: 'On-Time %', data: values } ] },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true, max: 100 } },
+        plugins: { legend: { position: 'bottom' } }
+      }
+    });
+  }
+}
+// --- REPLACE ONLY THESE TWO FUNCTIONS END ---
+
+/* Build sub-tabs and initial render when the KPIs tab is activated */
+function initKpiTabOnce(){
+  if($("kpiSubTabs").dataset.ready) return;
+  $("kpiSubTabs").dataset.ready="1";
+  buildKpiSubTabs();
+  renderKpiCards(activeKpiDomain);
+}
+
+
+
 boot();
     document.addEventListener('click', (e)=>{
     const slot = document.getElementById('alertsSlot');
